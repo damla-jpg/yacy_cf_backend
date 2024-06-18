@@ -18,7 +18,7 @@ class Birbs:
     This class is the main class of the project. Handles the server and the socket listener.
     '''
 
-    def __init__(self, run_socket_listener : bool = True):
+    def __init__(self):
         self.listener = None
         self.logger = None
 
@@ -27,9 +27,6 @@ class Birbs:
 
         # Initialize the configuration
         self.config_loader = ConfigLoader()
-
-        # Run the server
-        self.run(run_socket_listener)
         
     def init_logger(self):
         '''
@@ -49,7 +46,7 @@ class Birbs:
         # Initialize the logger
         self.logger = logging.getLogger("Main")
 
-    def run(self, run_socket_listener : bool = True):
+    def start(self, run_socket_listener : bool = True):
         '''
         This function runs the server and the socket listener.
         '''
@@ -106,4 +103,4 @@ if __name__ == '__main__':
 
     # Run the program
     # !! Pass False to the constructor to disable the socket listener !!
-    birbs.run()
+    birbs.start(run_socket_listener=True)
