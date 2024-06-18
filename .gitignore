@@ -152,7 +152,7 @@ dmypy.json
 .pytype/
 
 # To keep user information local
-config.json
+/config.json
 
 # Cython debug symbols
 cython_debug/
