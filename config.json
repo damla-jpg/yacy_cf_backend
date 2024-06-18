@@ -1,7 +1,7 @@
 {
     "yacy": {
-        "username": "test-123",
-        "password": "selin1234",
+        "username": "",
+        "password": "",
         "port": 8090
     },
     "flask": {
