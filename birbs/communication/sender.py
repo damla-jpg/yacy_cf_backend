@@ -27,6 +27,9 @@ def send_message(ip : str, port : int, message : str):
 
         print(f"Received response: {response}")
 
+        # TODO: Implement the response handling logic here, this is a TCP connection so 
+        # we need to handle the response
+
         # Close the socket
         client_socket.close()
     except Exception as e:

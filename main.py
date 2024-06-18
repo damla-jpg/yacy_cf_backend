@@ -11,11 +11,7 @@ import time
 # Custom imports
 from birbs.server import start_server
 from birbs.communication import Listener
-
-# Constants
-FLASK_PORT = 3001
-HOST = 'localhost'
-SOCKET_PORT = 3002
+from birbs.config import ConfigLoader
 
 class Birbs:
     '''
@@ -28,6 +24,9 @@ class Birbs:
 
         # Initialize the logger
         self.init_logger()
+
+        # Initialize the configuration
+        self.config_loader = ConfigLoader()
 
         # Run the server
         self.run(run_socket_listener)
@@ -61,8 +60,12 @@ class Birbs:
                 self.logger.info("Starting the socket listener...")
             
                 # Start the socket listener
-                self.listener = Listener(HOST, SOCKET_PORT)
-                self.listener.start(HOST, SOCKET_PORT)
+                self.listener = Listener(
+                    self.config_loader.socket_settings['host'], 
+                    self.config_loader.socket_settings['port']
+                    )
+                
+                self.listener.start()
 
         except Exception as e:
             self.logger.error(f"An error occurred during initializing the socket thread: {e}")
@@ -73,7 +76,11 @@ class Birbs:
             self.logger.info("Starting the server...")
 
             # Start the server, this is a blocking call (technically main thread loop)
-            start_server(HOST, FLASK_PORT)
+            start_server(
+                self.config_loader.yacy_settings,
+                self.config_loader.flask_settings['host'], 
+                self.config_loader.flask_settings['port']
+                )
             
             self.logger.info("Quitting the server...")
         except Exception as e:

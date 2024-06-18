@@ -53,19 +53,23 @@ class Listener:
         if self.server_socket:
             self.server_socket.close()
 
-    def start(self, ip : str, port : int):
+    def start(self):
         '''
         This function starts the socket listener.
         '''
 
         # Create a new thread for listening
-        listener_thread = threading.Thread(target=self.listen, args=(ip, port))
+        listener_thread = threading.Thread(target=self.listen, args=(self.ip, self.port))
         listener_thread.start()
 
     def listen(self, ip : str, port : int):
         '''
         This function listens for incoming messages from the network.
         '''
+
+        if not ip or not port:
+            com_logger.error("Invalid IP or port.")
+            return
 
         try:
             com_logger.info(f"Trying to listen on {ip}:{port}...")
