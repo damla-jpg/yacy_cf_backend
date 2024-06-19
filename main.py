@@ -8,6 +8,7 @@ import sys
 import threading
 import logging
 import time
+import webbrowser
 
 # Custom imports
 from birbs.server import start_server
@@ -19,12 +20,18 @@ class Birbs:
     This class is the main class of the project. Handles the server and the socket listener.
     '''
 
-    def __init__(self):
+    def __init__(self, run_socket_listener=True):
+        '''
+        Constructor for the Birbs class.
+        '''
+        
+        # Initialize the variables
         self.listener = None
         self.logger = None
+        self.run_socket_listener = run_socket_listener
 
         # Initialize the logger
-        self.init_logger()
+        self.logger_rpath = self.init_logger()
 
         # Initialize the configuration
         self.config_loader = ConfigLoader()
@@ -50,14 +57,16 @@ class Birbs:
         # Logging handler for stdout
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
-    def start(self, run_socket_listener : bool = True):
+        return f"./resources/logs/server_log_{current_time}.log"
+
+    def start(self):
         '''
         This function runs the server and the socket listener.
         '''
 
         # Try to start the socket listener
         try:
-            if run_socket_listener:
+            if self.run_socket_listener:
                 self.logger.info("Starting the socket listener...")
             
                 # Start the socket listener
@@ -70,6 +79,8 @@ class Birbs:
 
         except Exception as e:
             self.logger.error(f"An error occurred during initializing the socket thread: {e}")
+
+            # Stop the server and the socket listener
             self.stop()
 
         # Try to start the server
@@ -88,6 +99,8 @@ class Birbs:
             self.logger.error(f"An error occurred during starting the server: {e}")
 
         self.logger.info("Quitting program...")
+
+        # Stop the server and the socket listener
         self.stop()
 
     def stop(self):
@@ -95,16 +108,18 @@ class Birbs:
         This function stops the server and the socket listener.
         '''
 
+        # Stop the socket listener
         if self.listener:
             self.listener.stop()
 
+        # Exit the program
         os._exit(0)
 
 
 if __name__ == '__main__':
     # Initialize the Birbs class
-    birbs = Birbs()
+    birbs = Birbs(run_socket_listener=True)
 
     # Run the program
     # !! Pass False to the constructor to disable the socket listener !!
-    birbs.start(run_socket_listener=True)
+    birbs.start()

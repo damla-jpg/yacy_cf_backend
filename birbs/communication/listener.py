@@ -26,6 +26,8 @@ class Listener:
         This function handles the incoming messages from the network.
         '''
         
+        com_logger.info("Handling the client...")
+
         try:
             while not self.stop_signal.is_set():
                 # Receive the message
@@ -39,9 +41,11 @@ class Listener:
                 
                 # TODO: Implement the message handling logic here
                 # Send the message back to the client
-                client_socket.send(message.encode('utf-8'))
+                # client_socket.send(message.encode('utf-8'))
         finally:
             client_socket.close()
+
+        com_logger.info("Client handled.")
 
     def stop(self):
         '''

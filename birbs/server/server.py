@@ -6,6 +6,9 @@ This file contains the server implementation for the Birbs project.
 import os
 import logging
 
+# Custom imports
+from birbs.communication import send_message as send_socket_message
+
 # Third-party imports
 import flask as fl
 import requests as req
@@ -132,13 +135,45 @@ def send_message():
         return jsonify(response.text)
     else:
         return jsonify(error='Failed to send message')
+    
+@app.route('/api/share_history', methods=['POST'])
+def share_history():
+    '''
+    This function shares the history of the user.
+    '''
+    server_logger.info("/api/share_history: sharing history...")
 
+    # Get the ip and port from the headers
+    ip = fl.request.headers.get('ip')
+    port = fl.request.headers.get('port')
+
+    # Check if the ip and port are valid
+    if not ip or not port:
+        server_logger.error("/api/share_history: Invalid IP or port.")
+        return jsonify(error='Invalid IP or port')
+
+    # Get the message from the parameters
+    message = fl.request.args.get('message')
+
+    server_logger.info(f"/api/share_history: Sending message to {ip}:{port} with message: {message}")
+
+    # Send the message to socket listener
+    try:
+        send_socket_message(ip, int(port), message)
+        server_logger.info("/api/share_history: Message sent.")
+
+        return jsonify(message='Message sent')
+    except Exception as e:
+        server_logger.error(f"/api/share_history: An error occurred: {e}")
+        
+        return jsonify(error='Failed to send message')
+    
 @app.route('/upload', methods=['POST'])
 def upload():
     '''
     This function uploads a file to the server.
     '''
-    
+
     if 'files' not in fl.request.files:
         return jsonify(error='No files were uploaded')
     file = fl.request.files['files']
