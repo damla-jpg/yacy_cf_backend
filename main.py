@@ -4,6 +4,7 @@ This is the main file of the project. It is the entry point of the project.
 
 # Default imports
 import os
+import sys
 import threading
 import logging
 import time
@@ -45,6 +46,9 @@ class Birbs:
     
         # Initialize the logger
         self.logger = logging.getLogger("Main")
+
+        # Logging handler for stdout
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 
     def start(self, run_socket_listener : bool = True):
         '''

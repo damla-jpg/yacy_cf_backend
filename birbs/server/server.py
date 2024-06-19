@@ -27,24 +27,17 @@ server_logger = logging.getLogger("Server")
 
 @app.route('/')
 def home():
+    '''
+    Home route, returns a simple message.
+    '''
     return jsonify(message="Hello, World!")
 
-@app.route('/api/send_message', methods=['POST'])
-def send_message():
-    hash = fl.request.args.get('hash')
-    subject = fl.request.args.get('subject')
-    message = fl.request.args.get('message')
-    url = f'http://localhost:{USERPORT}/MessageSend_p.html?hash={hash}&subject={subject}&message={message}'
-    print('url:', url)
-    response = req.post(url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD))
-    if response.status_code == 200:
-        return jsonify(response.text)
-    else:
-        return jsonify(error='Failed to send message')
-
-# turn this function to python
 @app.route('/getPeers', methods=['GET'])
 def getPeers():
+    '''
+    This function returns the list of peers in the network.
+    '''
+
     url = f'http://localhost:{USERPORT}/yacy/seedlist.json'
     response = req.get(url)
     if response.status_code == 200:
@@ -54,6 +47,10 @@ def getPeers():
 
 @app.route('/profile', methods=['GET'])
 def get_profile():
+    '''
+    This function returns the profile of the user.
+    '''
+    
     url = f'http://localhost:{USERPORT}/Network.xml'
     response = req.get(url)
     if response.status_code == 200:
@@ -64,6 +61,10 @@ def get_profile():
 
 @app.route('/search', methods=['GET'])
 def search():
+    '''
+    This function searches for a query in the network.
+    '''
+
     query = fl.request.args.get('query')
     startRecord = fl.request.args.get('startRecord')
     url = f'http://localhost:{USERPORT}/yacysearch.json?query={query}&resource=global&urlmaskfilter=.*&prefermaskfilter=&nav=all&startRecord={startRecord}'
@@ -76,6 +77,10 @@ def search():
 
 @app.route('/api/get_contact_list', methods=['GET'])
 def get_contact_list():
+    '''
+    This function returns the contact list of the user.
+    '''
+
     url = f'http://localhost:{USERPORT}/Messages_p.html'
     response = req.get(url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD))
     if response.status_code == 200:
@@ -86,6 +91,10 @@ def get_contact_list():
 
 @app.route('/api/retrieve_message_ids', methods=['GET'])
 def retrieve_message_ids():
+    '''
+    This function retrieves the message ids.
+    '''
+
     url = f'http://localhost:{USERPORT}/Messages_p.xml'
     response = req.get(url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD))
     if response.status_code == 200:
@@ -95,6 +104,10 @@ def retrieve_message_ids():
 
 @app.route('/api/get_message_contents', methods=['GET'])
 def retrieve_message_contents():
+    '''
+    This function retrieves the message contents.
+    '''
+
     messageId = fl.request.args.get('messageId')
     url = f'http://localhost:{USERPORT}/Messages_p.html?action=view&object={messageId}'
     response = req.get(url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD))
@@ -103,8 +116,29 @@ def retrieve_message_contents():
     else:
         return jsonify(error='Failed to retrieve message contents')
 
+@app.route('/api/send_message', methods=['POST'])
+def send_message():
+    '''
+    This function sends a message to a user.
+    '''
+
+    hash = fl.request.args.get('hash')
+    subject = fl.request.args.get('subject')
+    message = fl.request.args.get('message')
+    url = f'http://localhost:{USERPORT}/MessageSend_p.html?hash={hash}&subject={subject}&message={message}'
+    print('url:', url)
+    response = req.post(url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD))
+    if response.status_code == 200:
+        return jsonify(response.text)
+    else:
+        return jsonify(error='Failed to send message')
+
 @app.route('/upload', methods=['POST'])
 def upload():
+    '''
+    This function uploads a file to the server.
+    '''
+    
     if 'files' not in fl.request.files:
         return jsonify(error='No files were uploaded')
     file = fl.request.files['files']
