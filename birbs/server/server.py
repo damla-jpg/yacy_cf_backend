@@ -5,6 +5,7 @@ This file contains the server implementation for the Birbs project.
 # Default imports
 import os
 import logging
+import json
 
 # Custom imports
 from birbs.communication import send_message as send_socket_message
@@ -167,6 +168,58 @@ def share_history():
         server_logger.error(f"/api/share_history: An error occurred: {e}")
         
         return jsonify(error='Failed to send message')
+    
+@app.route('/api/create_whitelist', methods=['POST'])
+def create_whitelist():
+    '''
+    This function creates a whitelist.
+    '''
+
+    # get hash, ip and port from the headers
+    hash_peer = fl.request.args.get('hash')
+    ip = fl.request.args.get('ip')
+    port = fl.request.args.get('port')
+    peer_dict = {"whitelist": []}
+
+    # Check if the hash, ip and port are valid
+    if not hash or not ip or not port:
+        return jsonify(error='Invalid hash, IP or port')
+    else:
+        # Create a json file in the resources/whitelist folder
+        if not os.path.exists('resources/whitelist'):
+            os.makedirs('resources/whitelist')
+
+        try:
+            with open('resources/whitelist/whitelist.json', 'r', encoding="utf-8") as f:
+                peer_dict = json.load(f)        
+        except FileNotFoundError:
+            pass
+        except json.JSONDecodeError:
+            print(f)
+            print("Error decoding JSON")
+
+        # Append the new entry to the existing data
+        peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
+
+        with open('resources/whitelist/whitelist.json', 'w', encoding="utf-8") as f:
+            json.dump(peer_dict, f)
+
+        return jsonify(message='Whitelist created')
+
+@app.route('/api/get_whitelist', methods=['GET'])
+def get_whitelist():
+    '''
+    This function returns the whitelist.
+    '''
+
+    try:
+        with open('resources/whitelist/whitelist.json', 'r', encoding="utf-8") as f:
+            peer_dict = json.load(f)
+            return jsonify(peer_dict)
+    except FileNotFoundError:
+        return jsonify(error='Whitelist not found')
+    except json.JSONDecodeError:
+        return jsonify(error='Error decoding JSON')
     
 @app.route('/upload', methods=['POST'])
 def upload():
