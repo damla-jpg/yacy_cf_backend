@@ -72,6 +72,7 @@ def distance_metric(point1, point2):
 def distance_compare(origin, point1, point2):
     '''
     This function compares two points based on their distance from the origin.
+    Returns True if point1 is farther from the origin than point2.
     '''
 
     d1 = distance_metric(origin, point1)

@@ -1,6 +1,8 @@
 """
 Collaborative Filtering Implementation
-TODO: Add more information about the implementation (guys name, paper, etc.)
+This code in this section was taken from Krishna Shukla from the following repository:
+https://gitlab.com/ucbooks/dht/-/tree/main?ref_type=heads
+The code was modified to fit this project.
 """
 
 # pylint: disable= C0301
