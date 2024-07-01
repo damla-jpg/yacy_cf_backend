@@ -4,12 +4,21 @@ This module contains helper functions for the collaborative filtering algorithm.
 
 # Default imports
 import hashlib
+import random
 
 # Third-party imports
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
-# Custom imports
-from birbs.col_filtering import hash_size, hex_map
+b = 4
+N = 50
+hash_size = 16
+hex_map = {
+    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4,
+    '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    'a': 10, 'b': 11, 'c': 12, 'd': 13,
+    'e': 14, 'f': 15
+}
 
 def cosine_similarity(user_i, user_j):
     '''
@@ -89,3 +98,33 @@ def generate_node_id_from_ip(ip_address : str):
     '''
 
     return hashlib.md5(ip_address.encode()).hexdigest()[:hash_size]
+
+def generate_link_hashes(link: str):
+    '''
+    This function generates hashes the links for private search.
+    '''
+
+    return hashlib.md5(link.encode("utf-8")).hexdigest()
+
+
+def normalize_ratings_maxmin(ai: dict):
+    """
+    Function to normalize the ratings between -1 and 1.
+    Input: ai: url hash to ratings
+    Output: ai: url hash to normalized ratings
+    """
+
+    ratings = list(ai.values())
+
+    min_value = min(ai.values())
+    max_value = max(ai.values())
+    ai_ = {}
+    for index, (key, value) in enumerate(ai.items()):
+        search_hash = key
+
+        normalized_rating = 2 * (ratings[index] - min_value) / (max_value - min_value) - 1
+        
+        ai_[search_hash] = normalized_rating
+
+    return ai_
+

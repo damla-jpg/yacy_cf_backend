@@ -1,0 +1,28 @@
+{
+    "history": [
+        {
+            "query": "vrije universiteit",
+            "results": [
+                {
+                    "link": "https://fo.wikipedia.org/wiki/Vrije_Universiteit_Amsterdam",
+                    "frequency": 2
+                },
+                {
+                    "link": "https://de.wikipedia.org/wiki/Vrije_Universiteit_Amsterdam",
+                    "frequency": 1
+                }
+            ],
+            "total_frequency": 3
+        },
+        {
+            "query": "hello",
+            "results": [
+                {
+                    "link": "https://www.ukcolumn.org/community/forums/topic/hello-4/",
+                    "frequency": 1
+                }
+            ],
+            "total_frequency": 1
+        }
+    ]
+}

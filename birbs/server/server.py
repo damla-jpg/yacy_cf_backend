@@ -7,15 +7,16 @@ import os
 import logging
 import json
 
-# Custom imports
-from birbs.communication import send_message as send_socket_message
-
 # Third-party imports
 import flask as fl
 import requests as req
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_httpauth import HTTPDigestAuth
+
+# Custom imports
+from birbs.communication import send_message as send_socket_message
+import birbs.server.col_server_integration as cf
 
 # Initialize the Flask app
 app = Flask(__name__)
@@ -37,13 +38,13 @@ def home():
     return jsonify(message="Hello, World!")
 
 @app.route('/getPeers', methods=['GET'])
-def getPeers():
+def get_peers():
     '''
     This function returns the list of peers in the network.
     '''
 
     url = f'http://localhost:{USERPORT}/yacy/seedlist.json'
-    response = req.get(url)
+    response = req.get(url, timeout=60)
     if response.status_code == 200:
         return jsonify(response.json())
     else:
@@ -63,6 +64,81 @@ def get_profile():
         return jsonify(error='Failed to get profile')
     
 
+@app.route('/api/get_click', methods=['POST'])
+def get_history():
+    '''
+    This function saves the history from the request body sent by the user.
+    The  format of the body is:
+    {
+        "query": "hello",
+        "link": "link"
+    }
+    The format of the file to be appended is:
+    {
+        "history": [
+            {
+                "query": "hello",
+                "results": [
+                    {
+                        "link": "link"
+                        "frequency": 1
+                    }
+                ]
+                "total_frequency": 1
+            }
+        ]
+    }
+    '''
+
+    # Get the history from the request body
+    history = fl.request.json
+
+    # Check if the history is valid
+    if not history:
+        return jsonify(error='Invalid history')
+    
+    # Create a json file in the resources/history folder
+    if not os.path.exists('resources/history'):
+        os.makedirs('resources/history')
+    
+    try:
+        with open('resources/history/history.json', 'r', encoding="utf-8") as f:
+            history_dict = json.load(f)
+    except FileNotFoundError:
+        history_dict = {"history": []}
+    except json.JSONDecodeError:
+        return jsonify(error='Error decoding JSON')
+    
+    # if the query is already in the history, update the results
+    for entry in history_dict["history"]:
+
+        if entry["query"] == history["query"]:
+
+            entry["total_frequency"] += 1
+            for result in entry["results"]:
+
+                if result["link"] == history["link"]:
+                    result["frequency"] += 1
+                    with open('resources/history/history.json', 'w', encoding="utf-8") as f:
+                        json.dump(history_dict, f)
+                    return jsonify(message='History updated')
+                
+                entry["results"].append({"link": history["link"], "frequency": 1})
+                with open('resources/history/history.json', 'w', encoding="utf-8") as f:
+                    json.dump(history_dict, f)
+                return jsonify(message='History updated')
+            
+            with open('resources/history/history.json', 'w', encoding="utf-8") as f:
+                json.dump(history_dict, f)
+            return jsonify(message='History updated')
+    
+    with open('resources/history/history.json', 'w', encoding="utf-8") as f:
+        history_dict["history"].append({"query": history["query"], "results": [{"link": history["link"], "frequency": 1}], "total_frequency": 1})
+        json.dump(history_dict, f)
+
+    return jsonify(message='History saved')
+
+
 @app.route('/search', methods=['GET'])
 def search():
     '''
@@ -73,6 +149,27 @@ def search():
     startRecord = fl.request.args.get('startRecord')
     url = f'http://localhost:{USERPORT}/yacysearch.json?query={query}&resource=global&urlmaskfilter=.*&prefermaskfilter=&nav=all&startRecord={startRecord}'
     response = req.get(url)
+
+    # if not os.path.exists('resources/history'):
+    #         os.makedirs('resources/history')
+
+    # try:
+    #     with open('resources/history/history.json', 'r', encoding="utf-8") as f:
+    #         peer_dict = json.load(f)        
+    # except FileNotFoundError:
+    #     pass
+    # except json.JSONDecodeError:
+    #     print(f)
+    #     print("Error decoding JSON")
+
+    # Append the new entry to the existing data
+    # peer_dict["history"].append({"hash": hash_peer, "ip": ip, "port": port})
+
+    # with open('resources/whitelist/whitelist.json', 'w', encoding="utf-8") as f:
+    #     json.dump(peer_dict, f)
+
+    # return jsonify(message='Whitelist created')
+
     if response.status_code == 200:
         return jsonify(response.json())
     else:
@@ -233,12 +330,24 @@ def upload():
     if file.filename == '':
         return jsonify(error='No files were uploaded')
     if file:
-        if not os.path.exists('history'):
+        if not os.path.exists('resources/history'):
             os.makedirs('history')
-        file.save(os.path.join('history', file.filename))
+        file.save(os.path.join('resources/history', file.filename))
         return jsonify(message='File uploaded')
     else:
         return jsonify(error='Error uploading file')
+    
+
+@app.route('/test', methods=['GET'])
+def test_col():
+    '''
+    This function tests the COL.
+    '''
+    my_peer_ip, my_peer_port, my_peer_hash = cf.get_my_peer_info()
+
+    return jsonify(message='COL started')
+
+    
 
 def start_server(yacy_settings: dict, host : str, port : int):
     '''

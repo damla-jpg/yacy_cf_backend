@@ -28,14 +28,7 @@ import geocoder
 from sklearn.linear_model import LinearRegression
 
 # Custom Libraries
-from birbs.col_filtering.helpers import (
-    cosine_similarity,
-    hex_distance,
-    hex_different_index,
-    hex_compare,
-    generate_node_id_from_ip,
-)
-from birbs.col_filtering import b, hash_size, N, hex_map
+import birbs.col_filtering.helpers as helpers
 
 # Numpy error handling for debugging
 np.seterr(over="raise")
@@ -49,24 +42,29 @@ ADD_MESSAGE = "ADD_MESSAGE"
 FAILED_NODE = "FAILED_NODE"
 SEND_MODEL = "SEND_MODEL"
 
+b = 4
+N = 50
+hash_size = 16
+hex_map = {
+    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4,
+    '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+    'a': 10, 'b': 11, 'c': 12, 'd': 13,
+    'e': 14, 'f': 15
+}
+
 
 class COL:
     """
     Collaborative Filtering Class
     """
 
-    def __init__(self, ip_address, port, position):
+    def __init__(self, ip_address, port):
         # TODO: Most of these variables are not needed without the Pastry implementation
         # Initialize the variables
-        self.node_id = generate_node_id_from_ip(
-            str(position[0]) + "+" + str(position[1])
-        )
+        self.node_id = helpers.generate_node_id_from_ip(str(ip_address) + "+" + str(port))
         self.ip_address = ip_address
         self.port = int(port)
-        self.position = position
-        self.node_state = tuple(
-            (self.position, self.node_id, self.ip_address, self.port)
-        )
+        self.node_state = tuple((self.node_id, self.ip_address, self.port))
         self.r = [[None for j in range(pow(2, b))] for i in range(hash_size)]
         self.m = [None for x in range(pow(2, b + 1))]
         self.l_min = [None for x in range(pow(2, b - 1))]
@@ -75,7 +73,9 @@ class COL:
         self.overlay_interval = 20
         self.heartbeat_interval = 15
         self.pastry_nodes = []
+
         self.search_queries = []
+
         self.ht = {}
         self.delta = 15
         self.y = None  # The base model of the node
@@ -90,6 +90,21 @@ class COL:
         self.method = METHOD
         self.lock = threading.Lock()
 
+    def load_history(self):
+        """
+        Load the search history of the node
+        """
+
+        try: 
+            with open("resources/search_history/search_history.json", "r", encoding="utf-8") as handler:
+                history = json.load(handler)
+        except FileNotFoundError:
+            print("No search history found")
+            return
+        
+
+        self.search_queries = history["history"]
+
     def generate_hashes(self, qi):
         """
         Input: List of Dictionary with keys, query, hash and frequency
@@ -98,11 +113,7 @@ class COL:
 
         urls = {}
         for instance in qi:
-            url = instance["query"]
-            if url in urls:
-                urls[url] += 1
-            else:
-                urls[url] = 0
+            urls[instance["query"]] = instance["total_frequency"]
 
         ai = {}
         for key, value in urls.items():
@@ -186,11 +197,18 @@ class COL:
         """
         Random normally select a peer to send a model to
         Input: None
-        Output: node: { "ip_address": ip_address, "port": port, "id_": id, "position": position }
+        Output: node: { "ip_address": ip_address, "port": port, "id_": id}
         """
-
-        # TODO: Fetch the list of peers in the WHITELIST and select a random peer
-        return {}
+        
+        with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as handler:
+            whitelist = json.load(handler)
+        
+        if whitelist:
+            peer = random.choice(whitelist)
+            return peer
+        
+        print("No peers in the whitelist")
+        return None
 
     def lrmf_loop(self):
         """
@@ -230,7 +248,6 @@ class COL:
                         self.forward(
                             "SEND_MODEL",
                             (
-                                (p["position"][0], p["position"][1]),
                                 p["id_"],
                                 p["ip_address"],
                                 p["port"],
@@ -260,7 +277,6 @@ class COL:
                         self.forward(
                             "SEND_MODEL",
                             (
-                                (p["position"][0], p["position"][1]),
                                 p["id_"],
                                 p["ip_address"],
                                 p["port"],
@@ -289,7 +305,6 @@ class COL:
         Input:
             msg: The message to be sent (in this case command)
             data format:
-                [0]:  position,
                 [1]:  id_,
                 [2]:  ip_address,
                 [3]:  port,
@@ -359,3 +374,309 @@ class COL:
                 raise
 
         client_socket.close()
+
+    def drift_handler(self, y, xi, ai, bi, k, rp):
+        """
+        Function to check whether concept drift occured.
+        Input: Y: model, xi: user latent factors, ai: website ratings, bi: user bias
+        Output: Model (after checking for concept drift
+        """
+
+        e_hat = self.error_bias(y[0], xi, ai, bi, k, rp)
+        # print("The error is: ", e_hat)
+
+        y[1].append(e_hat)
+
+        if len(y[1]) > 0 and self.drift_occured(y[1]):
+            # print("drift occured initializing new model")
+            # print(Y[1])
+            y = self.initialize_model(ai, k)
+
+        return y
+
+    def drift_occured(self, model_history):
+        """
+        Function to check whether concept drift occured.
+        Input: model_history: an array of errors
+        Output: Boolean
+        """
+
+        # Smooth the error rates by applying sliding window based averaging
+        window_size = max(
+            len(model_history) // 2, 1
+        )  # Ensure window size is at least 1
+        # Perform sliding window-based averaging
+        if len(model_history) > 1:
+            for i in range(len(model_history) - window_size + 1):
+                window = model_history[i : i + window_size]
+                average_value = sum(window) / window_size
+                # Replace the values in the window with the calculated average
+                model_history[i : i + window_size] = [average_value] * window_size
+
+        # We then apply linear regression
+        model_history = np.array(model_history)
+        X = model_history.reshape(-1, 1)
+        model_ = LinearRegression()
+        model_.fit(X, model_history)
+        slope = model_.coef_[0]  # we use this slope
+        intercept = model_.intercept_
+
+        random_value = random.uniform(0, 1)
+        sigmoid_value = 1 / (1 + np.exp(-20 * (slope - 0.5)))
+
+        if random_value < sigmoid_value:
+            return True
+
+        return False
+
+    def predict(self, xi, ai, y, bi):
+        """
+        An array of predictions
+        """
+        local_hashes = list(ai.keys())
+
+        url_hash = []
+        weights = []
+        cis = []
+        for hash_ in y[0]:
+            url_hash.append(hash_)
+            weights.append(y[0][hash_]["w"])
+            cis.append(y[0][hash_]["ci"])
+
+        predictions = np.matmul(xi, np.array(weights).T) - bi - cis
+        indexes = np.argsort(predictions)[::-1]
+        p = []
+        for index in indexes:
+            p.append(url_hash[index])
+
+        nonlocal_hashes = []
+        for each_hash in p:
+            if each_hash not in local_hashes:
+                nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
+        if len(nonlocal_hashes) > self.max_rec:
+            nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
+
+        return nonlocal_hashes
+    
+    def update_model_with_bias(self, y, xi, ai, bi, k, lr, rp):
+
+        """
+        Update the latent factors using the bias update rule.
+        We update Y[0] (the model), ci in the model, xi and bi
+
+        ai: Dictionary with the key being the hash and the url a rating.
+        Y: Contains element to item latent factors each of size k.
+        xi: User latent factors
+        """
+
+        all_ai = list(ai.keys())
+
+        ratings = []
+        g = []
+        cis = []
+        for each_hash in all_ai:
+            ratings.append(ai[each_hash])
+            if each_hash in y[0]:
+                g.append(Y[0][each_hash]['w'])
+                cis.append(Y[0][each_hash]['ci'])
+            else:
+                g.append(np.random.normal(loc=0.0, scale=1.0, size=k))
+                cis.append(np.random.normal(loc=0.0, scale=1.0))
+
+        ratings = np.array(ratings, dtype="float64")
+        g = np.array(g, dtype="float64")
+        cis = np.array(cis, dtype="float64")
+
+        xprime = xi.copy()
+        gprime = g.copy()
+        biprime = bi
+        cisprime = cis.copy()
+
+        for j in range(0, len(all_ai)):
+            rating = ratings[j]
+            eij = rating - np.matmul(xi, g[j].T) - bi - cis[j]
+            xprime = (1-lr*rp) * xprime + lr * eij * g[j]
+            gprime[j] = (1-lr*rp) * gprime[j] + lr * eij * xi
+            biprime = (1-lr*rp) * biprime + lr * eij
+            cisprime[j] = (1-lr*rp) * cisprime[j] + lr * eij
+
+        # Normalize xprime, biprime by the number of ratings
+        # xprime = xprime / len(all_ai)
+        # biprime = biprime / len(all_ai)
+
+        for each_hash in all_ai:
+            y[0][each_hash]['age'] += 1
+            y[0][each_hash]['w'] = gprime[all_ai.index(each_hash)]
+            y[0][each_hash]['ci'] = cisprime[all_ai.index(each_hash)]
+
+        return y, xprime, biprime
+
+    def on_receive_model(self, model):
+        """
+        Function to execute when the model is received.
+        Input: model: Model of the format:
+            {
+                Y: {
+                   hash_1: { w: -, age: -, ci: - },
+                   ...
+                   hash_n: { w: -, age: -, ci: - }
+                },
+                history: []
+            }
+        """
+
+        qi = self.search_queries
+        ai = self.generate_hashes(qi)
+        ai = self.normalize_ratings(ai)
+        model_keys = list(self.y[0].keys())
+        new_keys = {}
+
+        for key, value in ai.items():
+            if key not in model_keys:
+                new_keys[key] = ai[key]
+
+        updated_y = self.initialize_model(new_keys, self.k)
+
+        ############ WARNING: THIS MIGHT BE A BUG ##############
+        self.merge_models(self.merge_models(self.y, updated_y), model)
+
+        y, xi, bi = self.update_model_with_bias(
+            self.y, self.xi, ai, self.bi, self.k, self.lr, self.rp
+        )
+
+        # Normalize the latent factors by the length of the ratings
+        # This is because in update step we repeat the multiplication len(ai) times
+        xi = xi / len(list(ai.keys()))
+        bi = bi / len(list(ai.keys()))
+
+        # How do you handle predictions?
+        predictions = self.predict(xi, ai, y, bi)
+        if predictions:
+            self.p = predictions
+
+        self.y = y
+        self.xi = xi
+        self.bi = bi
+        self.received_y.append(y)
+        error = self.error_bias(y, xi, ai, bi, self.k, self.rp)
+
+        print("The error is: ", error)
+
+        RESULTS_PATH = os.path.join("results", self.node_id + ".json")
+
+        with self.lock:
+            if not os.path.exists(RESULTS_PATH):
+                with open(RESULTS_PATH, "w+") as handler:
+                    handler.write(json.dumps({}))
+
+            with open(RESULTS_PATH, "r") as handler:
+
+                file_content = handler.read().strip()
+
+                node_results = json.loads(file_content)
+
+            if self.method in node_results:
+                node_results[self.method].append(error)
+            else:
+                node_results[self.method] = [error]
+
+            with open(RESULTS_PATH, "w+") as handler:
+                handler.write(json.dumps(node_results))
+                handler.flush()
+
+    def error_bias(self, y, xi, ai, bi, k, rp):
+        """
+        Calculate the error of a model.
+        Input: Y: model, xi: user latent factors, ai: ratings, bi:
+        """
+
+        all_ai = list(ai.keys())
+
+        ratings = []
+        g = []
+        cis = []
+        for each_hash in all_ai:
+            ratings.append(ai[each_hash])
+            if each_hash in y[0]:
+                g.append(y[0][each_hash]["w"])
+                cis.append(y[0][each_hash]["ci"])
+            else:
+                g.append(np.random.normal(loc=0.0, scale=1.0, size=k))
+                cis.append(np.random.normal(loc=0.0, scale=1.0))
+
+        ratings = np.array(ratings, dtype="float64")
+        g = np.array(g, dtype="float64")
+        cis = np.array(cis, dtype="float64")
+
+        predictions = np.matmul(xi, g.T) - bi - cis
+
+        data_fit_term = 0.5 * np.sum((ratings - predictions) ** 2)
+
+        regularization_term = (
+            0.5
+            * rp
+            * (
+                np.linalg.norm(xi) ** 2
+                + np.linalg.norm(g, "fro") ** 2
+                + abs(bi) ** 2
+                + np.linalg.norm(cis) ** 2
+            )
+        )
+
+        error = data_fit_term + regularization_term
+
+        return error
+
+    def merge_models(self, y, y_hat):
+        """
+        Function to merge the incoming model into the one that is already present.
+        y: local model
+        y_hat: incoming model
+        """
+
+        u = list(set(list(y[0].keys()) + list(y_hat[0].keys())))
+
+        y_k = {}
+        for element in u:
+            y_k[element] = {"age": 0, "w": None, "ci": None}
+
+        for j in u:
+            if j in y[0] and j in y_hat[0]:
+                if y_hat[0][j]["age"] != 0:
+                    w = y_hat[0][j]["age"] / (y[0][j]["age"] + y_hat[0][j]["age"])
+                    y_k[j]["age"] = max(y_hat[0][j]["age"], y[0][j]["age"])
+                    y_k[j]["w"] = (1 - w) * y[0][j]["w"] + w * y_hat[0][j]["w"]
+                    y_k[j]["ci"] = (1 - w) * y[0][j]["ci"] + w * y_hat[0][j]["ci"]
+                else:
+                    y_k[j]["age"] = y[0][j]["age"]
+                    y_k[j]["w"] = y[0][j]["w"]
+                    y_k[j]["ci"] = y[0][j]["ci"]
+            else:
+                if j in y[0]:
+                    y_k[j]["age"] = y[0][j]["age"]
+                    y_k[j]["w"] = y[0][j]["w"]
+                    y_k[j]["ci"] = y[0][j]["ci"]
+                else:
+                    y_k[j]["age"] = y_hat[0][j]["age"]
+                    y_k[j]["w"] = y_hat[0][j]["w"]
+                    y_k[j]["ci"] = y_hat[0][j]["ci"]
+
+    #start function
+    def start(self):
+        """
+        Function to start the Collaborative Filtering node.
+        """
+
+        # Initialize the Collaborative Filtering node
+        
+
+        # Load the search history
+        node.load_history()
+
+        # Start the LRMF thread
+        # node.lrmf_run()
+
+        # Start the Pastry thread
+        # node.start()
+
+        return node
