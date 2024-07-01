@@ -1,9 +1,1 @@
-{
-    "whitelist": [
-        {
-            "hash": "6ZvxVMhDADMw",
-            "ip": "80.57.135.211",
-            "port": "8090"
-        }
-    ]
-}
+{"whitelist": [{"hash": "8rKvEb6KTbmI", "ip": "80.57.135.211", "port": "8091"}]}

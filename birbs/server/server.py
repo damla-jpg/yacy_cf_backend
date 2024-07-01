@@ -223,10 +223,10 @@ def send_message():
     This function sends a message to a user.
     '''
 
-    hash = fl.request.args.get('hash')
+    hash_ = fl.request.args.get('hash')
     subject = fl.request.args.get('subject')
     message = fl.request.args.get('message')
-    url = f'http://localhost:{USERPORT}/MessageSend_p.html?hash={hash}&subject={subject}&message={message}'
+    url = f'http://localhost:{USERPORT}/MessageSend_p.html?hash={hash_}&subject={subject}&message={message}'
     print('url:', url)
     response = req.post(url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD))
     if response.status_code == 200:
@@ -318,6 +318,36 @@ def get_whitelist():
     except json.JSONDecodeError:
         return jsonify(error='Error decoding JSON')
     
+@app.route('/api/delete_peer_from_whitelist', methods=['DELETE'])
+def delete_peer_from_whitelist():
+    '''
+    This function deletes a peer from the whitelist.
+    '''
+
+    # Get the hash from the parameters
+    hash_peer = fl.request.args.get('hash')
+    peer_dict = {"whitelist": []}
+
+    # Check if the hash is valid
+    if not hash_peer:
+        return jsonify(error='Invalid hash')
+    else:
+        try:
+            with open('resources/whitelist/whitelist.json', 'r', encoding="utf-8") as f:
+                peer_dict = json.load(f)        
+        except json.JSONDecodeError:
+            return jsonify(error='Error decoding JSON')
+
+        # Delete the peer from the whitelist
+        for peer in peer_dict["whitelist"]:
+            if peer["hash"] == hash_peer:
+                peer_dict["whitelist"].remove(peer)
+                with open('resources/whitelist/whitelist.json', 'w', encoding="utf-8") as f:
+                    json.dump(peer_dict, f)
+                return jsonify(message='Peer deleted')
+        
+        return jsonify(error='Peer not found')
+    
 @app.route('/upload', methods=['POST'])
 def upload():
     '''
@@ -343,7 +373,7 @@ def test_col():
     '''
     This function tests the COL.
     '''
-    my_peer_ip, my_peer_port, my_peer_hash = cf.get_my_peer_info()
+    cf.get_my_peer_info()
 
     return jsonify(message='COL started')
 

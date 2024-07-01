@@ -9,6 +9,7 @@ The code was modified to fit this project.
 
 # Default Libraries
 import os
+import sys
 import math
 import hashlib
 import socket
@@ -29,6 +30,8 @@ from sklearn.linear_model import LinearRegression
 
 # Custom Libraries
 import birbs.col_filtering.helpers as helpers
+import birbs.server.server as server
+from birbs.config import ConfigLoader
 
 # Numpy error handling for debugging
 np.seterr(over="raise")
@@ -58,10 +61,14 @@ class COL:
     Collaborative Filtering Class
     """
 
-    def __init__(self, ip_address, port):
+    def __init__(self, ip_address, port, hash_):
+        
+        # Initialize the configuration
+        self.config_loader = ConfigLoader()
+
         # TODO: Most of these variables are not needed without the Pastry implementation
         # Initialize the variables
-        self.node_id = helpers.generate_node_id_from_ip(str(ip_address) + "+" + str(port))
+        self.node_id = hash_
         self.ip_address = ip_address
         self.port = int(port)
         self.node_state = tuple((self.node_id, self.ip_address, self.port))
@@ -77,7 +84,7 @@ class COL:
         self.search_queries = []
 
         self.ht = {}
-        self.delta = 15
+        self.delta = 5
         self.y = None  # The base model of the node
         self.received_y = []  # Storage for the received models
         self.xi = None  # Node latent factors
@@ -96,8 +103,9 @@ class COL:
         """
 
         try: 
-            with open("resources/search_history/search_history.json", "r", encoding="utf-8") as handler:
+            with open("resources/history/history.json", "r", encoding="utf-8") as handler:
                 history = json.load(handler)
+                self.search_queries = history["history"]
         except FileNotFoundError:
             print("No search history found")
             return
@@ -197,14 +205,14 @@ class COL:
         """
         Random normally select a peer to send a model to
         Input: None
-        Output: node: { "ip_address": ip_address, "port": port, "id_": id}
+        Output: node: { "ip_address": ip_address, "port": port, "hash": id}
         """
         
         with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as handler:
             whitelist = json.load(handler)
         
         if whitelist:
-            peer = random.choice(whitelist)
+            peer = random.choice(whitelist["whitelist"])
             return peer
         
         print("No peers in the whitelist")
@@ -243,13 +251,15 @@ class COL:
                     # Select a peer
                     p = self.select_peer()
 
+                    print(f"Selected peer: {p}")
+
                     # If a peer is selected, send the model
                     if p:
                         self.forward(
                             "SEND_MODEL",
                             (
-                                p["id_"],
-                                p["ip_address"],
+                                p["hash"],
+                                p["ip"],
                                 p["port"],
                                 self.y,
                                 self.node_state,
@@ -276,13 +286,13 @@ class COL:
                     if p:
                         self.forward(
                             "SEND_MODEL",
-                            (
-                                p["id_"],
-                                p["ip_address"],
+                            [
+                                p["hash"],
+                                p["ip"],
                                 p["port"],
                                 y_hat,
-                                self.node_state,
-                            ),
+                                self.node_state
+                            ]
                         )
 
     def lrmf_run(self):
@@ -305,75 +315,27 @@ class COL:
         Input:
             msg: The message to be sent (in this case command)
             data format:
-                [1]:  id_,
+                [1]:  hash,
                 [2]:  ip_address,
                 [3]:  port,
                 [4]:  Y,
                 [5]:  nodeState
         """
 
-        # TODO: This part might not be needed
-        # If the message is a JOIN_MESSAGE, that means a new node is joining the network
-        if msg == JOIN_MESSAGE:
-            # Calculate the distance between the current node and the target node
-            x = hex_different_index(data[1], self.node_id)
-
-            # Create a socket connection
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-            # Connect to the target node
-            client_socket.connect((data[2], data[3]))
-
-            # Form the message
-            message = pickle.dumps({"message": "UPDATE_R", "x": x, "R[x]": self.r[x]})
-
-            # Send the message
-            for i in range(0, len(message), 1024):
-                chunk = message[i : i + 1024]
-                try:
-                    # Send the message, blocks the thread until the message is sent
-                    client_socket.sendall(chunk)
-                except Exception as e:
-                    print("forward error: ", e)
-                    raise
-
-            client_socket.close()
-
-        # Call the __forward__ extension function
-        self.__forward__(msg, data)
-
-    def __forward__(self, msg, data):
-        """
-        Extension function for forwarding messages to other nodes.
-        """
-
-        # TODO: Ip address and port should be the target node's ip address and port
-        ip = None
-        port = None
-
-        # Create a socket connection
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        # Connect to the target node
-        client_socket.connect(ip, port)
-
-        # TODO: Don't have to use pickle for this but sure
         # Form the message
-        message = pickle.dumps({"message": "FORWARD", "msg": msg, "data": data})
+        message_pure = {"msg": msg, "data": data}
+        query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/send_message?hash={data[0]}&subject={message_pure["msg"]}&message={message_pure["data"]}"
 
-        # Send the message
-        for i in range(0, len(message), 1024):
-            # Split the message into chunks of 1024 bytes
-            chunk = message[i : i + 1024]
+        print(f"Forwarding message: {query}")
+        print(f"Data: {data}")
+        # convert bytes to megabytes
+        print(f"Data size: {sys.getsizeof(data) / 1024 / 1024} MB")
+        try:
+            response = requests.post(query)
+            print(response)
+        except requests.exceptions.RequestException as e:
+            print(e)
 
-            try:
-                # Send the message, blocks the thread until the message is sent
-                client_socket.sendall(chunk)
-            except Exception as e:
-                print("__forward__ error: ", e)
-                raise
-
-        client_socket.close()
 
     def drift_handler(self, y, xi, ai, bi, k, rp):
         """
@@ -477,8 +439,8 @@ class COL:
         for each_hash in all_ai:
             ratings.append(ai[each_hash])
             if each_hash in y[0]:
-                g.append(Y[0][each_hash]['w'])
-                cis.append(Y[0][each_hash]['ci'])
+                g.append(y[0][each_hash]['w'])
+                cis.append(y[0][each_hash]['ci'])
             else:
                 g.append(np.random.normal(loc=0.0, scale=1.0, size=k))
                 cis.append(np.random.normal(loc=0.0, scale=1.0))
@@ -668,15 +630,6 @@ class COL:
         """
 
         # Initialize the Collaborative Filtering node
-        
+        self.load_history()
 
-        # Load the search history
-        node.load_history()
-
-        # Start the LRMF thread
-        # node.lrmf_run()
-
-        # Start the Pastry thread
-        # node.start()
-
-        return node
+        self.lrmf_run()
