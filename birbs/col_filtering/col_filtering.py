@@ -20,13 +20,14 @@ import pickle
 import json
 import time
 import threading
+import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
 
 
 # Third Party Libraries
 import requests
 import numpy as np
 import geocoder
-from sklearn.linear_model import LinearRegression
 
 # Custom Libraries
 import birbs.col_filtering.helpers as helpers
@@ -97,21 +98,19 @@ class COL:
         self.method = METHOD
         self.lock = threading.Lock()
 
-    def load_history(self):
+    def load_history(self, path="resources/history/history.json"):
         """
         Load the search history of the node
         """
 
         try: 
-            with open("resources/history/history.json", "r", encoding="utf-8") as handler:
+            with open(path, "r", encoding="utf-8") as handler:
                 history = json.load(handler)
-                self.search_queries = history["history"]
         except FileNotFoundError:
             print("No search history found")
             return
         
-
-        self.search_queries = history["history"]
+        return history["history"]
 
     def generate_hashes(self, qi):
         """
@@ -218,6 +217,20 @@ class COL:
         print("No peers in the whitelist")
         return None
 
+    def create_dummy_model(self):
+        '''
+        Create a dummy model for testing purposes.
+        '''
+        # Initialize the search queries
+        qi = self.load_history(path="resources/history/dummy_search_history_2.json")
+        # Generate the hashes and normalize the ratings
+        ai = self.generate_hashes(qi)
+        ai = self.normalize_ratings(ai)
+
+        # Initialize the latent factors and biases
+        y = self.initialize_model(ai, k=self.k)
+        return y
+
     def lrmf_loop(self):
         """
         This function runs the LRMF algorithm.
@@ -323,79 +336,38 @@ class COL:
         """
 
         # Form the message
-        message_pure = {"msg": msg, "data": data}
+        
+        data_pkl = pickle.dumps(data)
+        message_pure = {"msg": msg, "data": data_pkl}
+
         query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/send_message?hash={data[0]}&subject={message_pure["msg"]}&message={message_pure["data"]}"
 
-        print(f"Forwarding message: {query}")
-        print(f"Data: {data}")
+        # print(f"Forwarding message: {query}")
+        # print(f"Data: {data}")
         # convert bytes to megabytes
-        print(f"Data size: {sys.getsizeof(data) / 1024 / 1024} MB")
+
+        # print(f"Data size: {sys.getsizeof(data_pkl) / 1024 / 1024} MB")
         try:
             response = requests.post(query)
             print(response)
         except requests.exceptions.RequestException as e:
             print(e)
-
-
-    def drift_handler(self, y, xi, ai, bi, k, rp):
-        """
-        Function to check whether concept drift occured.
-        Input: Y: model, xi: user latent factors, ai: website ratings, bi: user bias
-        Output: Model (after checking for concept drift
-        """
-
-        e_hat = self.error_bias(y[0], xi, ai, bi, k, rp)
-        # print("The error is: ", e_hat)
-
-        y[1].append(e_hat)
-
-        if len(y[1]) > 0 and self.drift_occured(y[1]):
-            # print("drift occured initializing new model")
-            # print(Y[1])
-            y = self.initialize_model(ai, k)
-
-        return y
-
-    def drift_occured(self, model_history):
-        """
-        Function to check whether concept drift occured.
-        Input: model_history: an array of errors
-        Output: Boolean
-        """
-
-        # Smooth the error rates by applying sliding window based averaging
-        window_size = max(
-            len(model_history) // 2, 1
-        )  # Ensure window size is at least 1
-        # Perform sliding window-based averaging
-        if len(model_history) > 1:
-            for i in range(len(model_history) - window_size + 1):
-                window = model_history[i : i + window_size]
-                average_value = sum(window) / window_size
-                # Replace the values in the window with the calculated average
-                model_history[i : i + window_size] = [average_value] * window_size
-
-        # We then apply linear regression
-        model_history = np.array(model_history)
-        X = model_history.reshape(-1, 1)
-        model_ = LinearRegression()
-        model_.fit(X, model_history)
-        slope = model_.coef_[0]  # we use this slope
-        intercept = model_.intercept_
-
-        random_value = random.uniform(0, 1)
-        sigmoid_value = 1 / (1 + np.exp(-20 * (slope - 0.5)))
-
-        if random_value < sigmoid_value:
-            return True
-
-        return False
+        
+        dummy_model = self.create_dummy_model()
+        self.on_receive_model(dummy_model)
+        # self.on_receive_model(data[3])
 
     def predict(self, xi, ai, y, bi):
         """
         An array of predictions
         """
         local_hashes = list(ai.keys())
+
+
+        # WHEN A NEW SEARCH IS MADE, RUN THE ALGORITHM 
+        # TAKE THE FIRST PREDICTION AND RETURN ITS LINKS
+        # TECHNICALLY SHOULD BE THE LAST AI W
+
 
         url_hash = []
         weights = []
@@ -472,6 +444,43 @@ class COL:
             y[0][each_hash]['ci'] = cisprime[all_ai.index(each_hash)]
 
         return y, xprime, biprime
+    
+    def receive_models(self):
+        """
+        Function to retrieve all received models.
+        """
+
+        # Retrieving message ids
+        query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/retrieve_message_ids"
+        document = requests.get(query).text
+
+        xml_root = ET.fromstring(document)
+        message_ids = [{"id": message.get('id')} for message in xml_root.findall('.//message')]
+
+        all_models = {}
+
+        # Retrieving messages
+        for message in message_ids:
+            query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/get_message_contents?messageId={message['id']}"
+            document = BeautifulSoup(requests.get(query).text, "html.parser")
+            pairs = document.find(class_='pairs')
+            if pairs:
+                message_data = pairs.find_all('dd')
+                from_ = message_data[0].get_text()
+                to_ = message_data[1].get_text()
+                date = message_data[2].get_text()
+                subject = message_data[3].get_text()
+                message = message_data[4].get_text()
+        
+                # Unpickle the message
+                # message is a string that is pickled
+                message = pickle.loads(message.encode())
+        
+                # Add the message to the dictionary
+                if subject == "SEND_MODEL":
+                    all_models[from_] = message
+        
+        return all_models
 
     def on_receive_model(self, model):
         """
@@ -487,23 +496,46 @@ class COL:
             }
         """
 
+        print("Received model")
+        print(self.receive_models())
+        
+        ############################ UPDATE MY OWN MODEL WITH MY NEW SEARCHES ############################
+
+        # Fetch the search history
         qi = self.search_queries
+
+        # Generate the hashes and normalize the ratings
         ai = self.generate_hashes(qi)
         ai = self.normalize_ratings(ai)
+
+        # TODO: This is a temporary fix. 
+        if self.y is None:
+            raise Exception("BU NEDEN EMPTY AMK")
+        
+        # Find the newly added keys
+        # !! we use index 0 because the first index is the model itself, the second index is the history
         model_keys = list(self.y[0].keys())
         new_keys = {}
 
-        for key, value in ai.items():
+        for key, _ in ai.items():
             if key not in model_keys:
                 new_keys[key] = ai[key]
 
-        updated_y = self.initialize_model(new_keys, self.k)
+        
+        # Initialize the model with the new keys
+        y_new = self.initialize_model(new_keys, self.k)
+        
+        # Merge the models
+        y = self.merge_models(self.y, y_new)
+        
+        ############################ UPDATE MY OWN MODEL WITH THE RECEIVED MODEL ############################
 
-        ############ WARNING: THIS MIGHT BE A BUG ##############
-        self.merge_models(self.merge_models(self.y, updated_y), model)
+        # Merge the new model with the received model
+        y = self.merge_models(y, model)
 
+        # Update the model with the bias
         y, xi, bi = self.update_model_with_bias(
-            self.y, self.xi, ai, self.bi, self.k, self.lr, self.rp
+            y, self.xi, ai, self.bi, self.k, self.lr, self.rp
         )
 
         # Normalize the latent factors by the length of the ratings
@@ -511,27 +543,41 @@ class COL:
         xi = xi / len(list(ai.keys()))
         bi = bi / len(list(ai.keys()))
 
-        # How do you handle predictions?
+        # Make predictions
         predictions = self.predict(xi, ai, y, bi)
+        print("Predictions: ", predictions)
+        
+        # If predictions are made assign them to the class variable
         if predictions:
             self.p = predictions
 
+        # Update the class variables
         self.y = y
         self.xi = xi
         self.bi = bi
+
+        # Add the model to the received models. This will be used in LSFM_Loop
         self.received_y.append(y)
+
+        # Calculate the error
         error = self.error_bias(y, xi, ai, bi, self.k, self.rp)
 
         print("The error is: ", error)
 
-        RESULTS_PATH = os.path.join("results", self.node_id + ".json")
+        ########################################## SAVE THE RESULTS ##########################################
+       
+        # Form the path
+        results_path = os.path.join("results", self.node_id + ".json")
 
+        # Save the results
         with self.lock:
-            if not os.path.exists(RESULTS_PATH):
-                with open(RESULTS_PATH, "w+") as handler:
+            if not os.path.exists(results_path):
+                # create directory
+                os.makedirs(os.path.dirname(results_path), exist_ok=True)
+                with open(results_path, "w+") as handler:
                     handler.write(json.dumps({}))
 
-            with open(RESULTS_PATH, "r") as handler:
+            with open(results_path, "r") as handler:
 
                 file_content = handler.read().strip()
 
@@ -542,7 +588,7 @@ class COL:
             else:
                 node_results[self.method] = [error]
 
-            with open(RESULTS_PATH, "w+") as handler:
+            with open(results_path, "w+") as handler:
                 handler.write(json.dumps(node_results))
                 handler.flush()
 
@@ -601,6 +647,8 @@ class COL:
         y_k = {}
         for element in u:
             y_k[element] = {"age": 0, "w": None, "ci": None}
+        
+        historyk = y[1]
 
         for j in u:
             if j in y[0] and j in y_hat[0]:
@@ -622,6 +670,8 @@ class COL:
                     y_k[j]["age"] = y_hat[0][j]["age"]
                     y_k[j]["w"] = y_hat[0][j]["w"]
                     y_k[j]["ci"] = y_hat[0][j]["ci"]
+        
+        return (y_k, historyk)
 
     #start function
     def start(self):
@@ -630,6 +680,11 @@ class COL:
         """
 
         # Initialize the Collaborative Filtering node
-        self.load_history()
+        self.search_queries = self.load_history()
 
         self.lrmf_run()
+
+        
+
+
+        
