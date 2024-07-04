@@ -49,18 +49,20 @@ class Listener:
                 # If the message is empty, break the loop
                 if not chunk:
                     break
-                
+                else:
+                    com_logger.info(f"Received chunk: {chunk}")
+                    
                 # Append the chunk to the message
                 message += chunk
 
         finally:
             # Send confirmation
-            client_socket.send(pickle.dumps("Message received."))
+            # client_socket.send(pickle.dumps("Message received."))
             
             # Close the socket
             client_socket.close()
 
-        message = pickle.loads(message)        
+        message = pickle.loads(message)   
 
         # Send the message to the backend
         # Get the flask server IP and port
