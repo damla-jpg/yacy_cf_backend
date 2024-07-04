@@ -358,7 +358,7 @@ class COL:
             col_logger.error(f"An error occurred while sending message: {e}")
         
         # TODO: Remove this
-        if True:
+        if False:
             dummy_model = self.create_dummy_model()
             self.on_receive_model(dummy_model)
         

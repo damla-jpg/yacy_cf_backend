@@ -47,7 +47,7 @@ class Listener:
                 chunk = client_socket.recv(1024)
                 
                 # If the message is empty, break the loop
-                if not message:
+                if not chunk:
                     break
                 
                 # Append the chunk to the message

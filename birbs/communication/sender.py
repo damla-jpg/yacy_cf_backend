@@ -20,6 +20,8 @@ def send_message(ip : str, port : int, message : str | dict):
     client_socket = None
     response = None
 
+    message = 'YARRAK'
+
     # Log the message
     sender_logger.info(f"Trying to send message to {ip}:{port} with message: {message}")
     
