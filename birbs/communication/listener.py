@@ -49,15 +49,15 @@ class Listener:
                 # If the message is empty, break the loop
                 if not chunk:
                     break
-                else:
-                    com_logger.info(f"Received chunk: {chunk}")
-                    
+                
+                com_logger.info(f"Received chunk: {chunk}")
+
                 # Append the chunk to the message
                 message += chunk
 
         finally:
             # Send confirmation
-            # client_socket.send(pickle.dumps("Message received."))
+            client_socket.send(pickle.dumps("Message received."))
             
             # Close the socket
             client_socket.close()

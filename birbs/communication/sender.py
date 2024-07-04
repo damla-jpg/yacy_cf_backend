@@ -20,8 +20,6 @@ def send_message(ip : str, port : int, message : str | dict):
     client_socket = None
     response = None
 
-    message = 'YARRAK'
-
     # Log the message
     sender_logger.info(f"Trying to send message to {ip}:{port} with message: {message}")
     
@@ -42,15 +40,17 @@ def send_message(ip : str, port : int, message : str | dict):
         # Convert the message to bytes
         message = pickle.dumps(message)
 
-        # Send the message
-        client_socket.send(message)
+        # Send the message chunk by chunk
+        for i in range(0, len(message), 1024):
+            chunk = message[i:i+1024]
+            client_socket.send(chunk)
 
         sender_logger.info(f"Message sent")
 
         # Receive the response
         response = pickle.loads(client_socket.recv(1024))
 
-        # print(f"Received response: {response}")
+        sender_logger.info(f"Received response: {response}")
 
         # TODO: Implement the response handling logic here, this is a TCP connection so 
         # we need to handle the response
