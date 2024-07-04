@@ -2,20 +2,29 @@
 This module is responsible for sending messages to the server.
 '''
 
+# Third party imports
+import pickle
+
 # Default imports
 import socket
 import logging
-2
+
 sender_logger = logging.getLogger("Sender")
 
-def send_message(ip : str, port : int, message : str):
+def send_message(ip : str, port : int, message : str | dict):
     '''
     This function sends a message to the server.
     '''
 
+    # Initialize the variables
     client_socket = None
+    response = None
 
+    # Log the message
     sender_logger.info(f"Trying to send message to {ip}:{port} with message: {message}")
+    
+
+    # Send the message
     try:
         # Create a socket
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -26,10 +35,10 @@ def send_message(ip : str, port : int, message : str):
         client_socket.connect((ip, port))
 
         sender_logger.info(f"Connected to {ip}:{port}")
-        sender_logger.info(f"Sending message: {message}")
+        sender_logger.info(f"Sending message")
         
         # Convert the message to bytes
-        message = message.encode('utf-8')
+        message = pickle.dumps(message)
 
         # Send the message
         client_socket.send(message)
@@ -37,7 +46,7 @@ def send_message(ip : str, port : int, message : str):
         sender_logger.info(f"Message sent")
 
         # Receive the response
-        # response = client_socket.recv(1024).decode('utf-8')
+        response = pickle.loads(client_socket.recv(1024))
 
         # print(f"Received response: {response}")
 
@@ -52,3 +61,5 @@ def send_message(ip : str, port : int, message : str):
     finally:
         if client_socket:
             client_socket.close()
+
+    return response

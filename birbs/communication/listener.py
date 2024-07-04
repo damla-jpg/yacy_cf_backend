@@ -7,6 +7,9 @@ import socket
 import threading
 import logging
 
+# Third party imports
+import pickle
+
 NUM_CONNECTIONS = 5
 com_logger = logging.getLogger("Communication")
 
@@ -31,7 +34,7 @@ class Listener:
         try:
             while not self.stop_signal.is_set():
                 # Receive the message
-                message = client_socket.recv(1024).decode('utf-8')
+                message = pickle.loads(client_socket.recv(1024))
                 
                 # If the message is empty, break the loop
                 if not message:

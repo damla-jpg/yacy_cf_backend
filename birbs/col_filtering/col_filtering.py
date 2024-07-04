@@ -22,7 +22,7 @@ import time
 import threading
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
-
+import logging
 
 # Third Party Libraries
 import requests
@@ -31,6 +31,7 @@ import geocoder
 
 # Custom Libraries
 import birbs.col_filtering.helpers as helpers
+from birbs.communication import send_message as send_socket_message
 import birbs.server.server as server
 from birbs.config import ConfigLoader
 
@@ -46,6 +47,9 @@ ADD_MESSAGE = "ADD_MESSAGE"
 FAILED_NODE = "FAILED_NODE"
 SEND_MODEL = "SEND_MODEL"
 
+# Initialize the logger
+col_logger = logging.getLogger("COL")
+
 b = 4
 N = 50
 hash_size = 16
@@ -55,6 +59,7 @@ hex_map = {
     'a': 10, 'b': 11, 'c': 12, 'd': 13,
     'e': 14, 'f': 15
 }
+
 
 
 class COL:
@@ -334,28 +339,29 @@ class COL:
                 [4]:  Y,
                 [5]:  nodeState
         """
-
+        
         # Form the message
-        
-        data_pkl = pickle.dumps(data)
-        message_pure = {"msg": msg, "data": data_pkl}
+        message = {"msg": msg, "data": data}
 
-        query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/send_message?hash={data[0]}&subject={message_pure["msg"]}&message={message_pure["data"]}"
+        # Fetch the ip and port
+        ip = data[1]
+        # Since the socket is running on a different port than yacy, we need to send it to a different port.
+        # Normally, the socket would be running on the yacy, so the port would be the same as the yacy port.
+        # However, for testing purposes, we are assuming that the socket is running on yacy port + 100
+        port = int(data[2]) + 100
 
-        # print(f"Forwarding message: {query}")
-        # print(f"Data: {data}")
-        # convert bytes to megabytes
-
-        # print(f"Data size: {sys.getsizeof(data_pkl) / 1024 / 1024} MB")
+        # Send the message to the peer
         try:
-            response = requests.post(query)
-            print(response)
-        except requests.exceptions.RequestException as e:
-            print(e)
+            response = send_socket_message(ip, int(port), message)
+            col_logger.info(f"Response from {ip}:{port}: {response}")
+        except Exception as e:
+            col_logger.error(f"An error occurred while sending message: {e}")
         
-        dummy_model = self.create_dummy_model()
-        self.on_receive_model(dummy_model)
-        # self.on_receive_model(data[3])
+        # TODO: Remove this
+        if True:
+            dummy_model = self.create_dummy_model()
+            self.on_receive_model(dummy_model)
+        
 
     def predict(self, xi, ai, y, bi):
         """
@@ -474,7 +480,11 @@ class COL:
         
                 # Unpickle the message
                 # message is a string that is pickled
-                message = pickle.loads(message.encode())
+                # get rid of empty spaces and new lines
+                message = message.replace(" ", "").replace("\n", "")
+                print("Message", message)
+                print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                message = pickle.loads(message, encoding="ASCII")
         
                 # Add the message to the dictionary
                 if subject == "SEND_MODEL":
