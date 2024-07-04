@@ -37,7 +37,7 @@ class Listener:
         '''
         
         # Initialize the variables
-        message : bytes = None
+        message : bytes = b""
 
         com_logger.info("Handling the client...")
 
