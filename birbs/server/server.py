@@ -394,6 +394,25 @@ def test_col():
 
     return jsonify(message="COL started")
 
+@app.route("/api/receive_model", methods=["POST"])
+def receive_model():
+    """
+    This function receives the model.
+    """
+
+    # Get the model from the request body, the model is a pickle
+    model = fl.request.data
+
+    # Check if the model is valid
+    if not model:
+        return jsonify(error="Invalid model")
+    
+    # TODO: Implement the model handling logic here
+    # ...
+
+    server_logger.info("Model received: %s", model)
+
+    return jsonify(message="Model received")
 
 def start_server(yacy_settings: dict, host: str, port: int):
     """

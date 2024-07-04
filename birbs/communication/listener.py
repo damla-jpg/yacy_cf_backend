@@ -6,9 +6,13 @@ This module is responsible for handling the communication between the peers in t
 import socket
 import threading
 import logging
+import requests
 
 # Third party imports
 import pickle
+
+# Custom imports
+from birbs.config import ConfigLoader
 
 NUM_CONNECTIONS = 5
 com_logger = logging.getLogger("Communication")
@@ -24,29 +28,54 @@ class Listener:
         self.server_socket = None
         self.stop_signal = threading.Event()
 
+        # Initialize the configuration
+        self.config_loader = ConfigLoader()
+
     def handle_client(self, client_socket : socket.socket):
         '''
         This function handles the incoming messages from the network.
         '''
         
+        # Initialize the variables
+        message : bytes = None
+
         com_logger.info("Handling the client...")
 
         try:
             while not self.stop_signal.is_set():
                 # Receive the message
-                message = pickle.loads(client_socket.recv(1024))
+                chunk = client_socket.recv(1024)
                 
                 # If the message is empty, break the loop
                 if not message:
                     break
-
-                print(f"Received message: {message}")
                 
-                # TODO: Implement the message handling logic here
-                # Send the message back to the client
-                # client_socket.send(message.encode('utf-8'))
+                # Append the chunk to the message
+                message += chunk
+
         finally:
+            # Send confirmation
+            client_socket.send(pickle.dumps("Message received."))
+            
+            # Close the socket
             client_socket.close()
+
+        message = pickle.loads(message)        
+
+        # Send the message to the backend
+        # Get the flask server IP and port
+        ip = self.config_loader.flask_settings['host']
+        port = self.config_loader.flask_settings['port']
+
+        # Send the message to the server
+        try:
+            response = requests.post(f"http://{ip}:{port}/api/receive_model", data=message)
+            com_logger.info(f"Message sent to the backend. Response: {response}")
+        except Exception as e:
+            com_logger.error(f"An error occurred while sending the message to the server: {e}")
+            
+        # Log the message
+        com_logger.info(f"Received message: {message}")
 
         com_logger.info("Client handled.")
 
