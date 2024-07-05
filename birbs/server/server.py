@@ -1,11 +1,13 @@
 """
 This file contains the server implementation for the Birbs project.
 """
+# pylint: disable=C0301, W0718, W0603
 
 # Default imports
 import os
 import logging
 import json
+import pickle
 
 # Third-party imports
 import flask as fl
@@ -33,6 +35,7 @@ server_logger = logging.getLogger("Server")
 ############################################################################################################
 #                                           Frontend Routes                                                #
 ############################################################################################################
+
 
 @app.route("/")
 def home():
@@ -63,7 +66,7 @@ def get_profile():
     """
 
     url = f"http://localhost:{USERPORT}/Network.xml"
-    response = req.get(url)
+    response = req.get(url, timeout=60)
     if response.status_code == 200:
         return response.text
     else:
@@ -160,9 +163,9 @@ def search():
     """
 
     query = fl.request.args.get("query")
-    startRecord = fl.request.args.get("startRecord")
-    url = f"http://localhost:{USERPORT}/yacysearch.json?query={query}&resource=global&urlmaskfilter=.*&prefermaskfilter=&nav=all&startRecord={startRecord}"
-    response = req.get(url)
+    start_record = fl.request.args.get("startRecord")
+    url = f"http://localhost:{USERPORT}/yacysearch.json?query={query}&resource=global&urlmaskfilter=.*&prefermaskfilter=&nav=all&startRecord={start_record}"
+    response = req.get(url, timeout=60)
 
     if response.status_code == 200:
         return jsonify(response.json())
@@ -179,7 +182,7 @@ def get_contact_list():
     url = f"http://localhost:{USERPORT}/Messages_p.html"
     response = req.get(
         url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    )
+    , timeout=60)
     if response.status_code == 200:
         return response.text
     else:
@@ -195,7 +198,7 @@ def retrieve_message_ids():
     url = f"http://localhost:{USERPORT}/Messages_p.xml"
     response = req.get(
         url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    )
+    , timeout=60)
     if response.status_code == 200:
         return response.text
     else:
@@ -208,11 +211,11 @@ def retrieve_message_contents():
     This function retrieves the message contents.
     """
 
-    messageId = fl.request.args.get("messageId")
-    url = f"http://localhost:{USERPORT}/Messages_p.html?action=view&object={messageId}"
+    message_id = fl.request.args.get("messageId")
+    url = f"http://localhost:{USERPORT}/Messages_p.html?action=view&object={message_id}"
     response = req.get(
         url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    )
+    , timeout=60)
     if response.status_code == 200:
         return response.text
     else:
@@ -232,12 +235,13 @@ def send_message():
     # print('url:', url)
     response = req.post(
         url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    )
+    , timeout=60)
     if response.status_code == 200:
         return jsonify(response.text)
     else:
         return jsonify(error="Failed to send message")
-    
+
+
 @app.route("/api/create_whitelist", methods=["POST"])
 def create_whitelist():
     """
@@ -344,9 +348,11 @@ def upload():
     else:
         return jsonify(error="Error uploading file")
 
+
 ############################################################################################################
 #                                           COL Integration                                                #
 ############################################################################################################
+
 
 @app.route("/api/share_history", methods=["POST"])
 def share_history():
@@ -368,11 +374,11 @@ def share_history():
     message = fl.request.args.get("message")
 
     server_logger.info(
-            "/api/share_history: Sending message to %s:%s with message: %s",
-            ip,
-            port,
-            message
-        )
+        "/api/share_history: Sending message to %s:%s with message: %s",
+        ip,
+        port,
+        message,
+    )
 
     # Send the message to socket listener
     try:
@@ -385,6 +391,7 @@ def share_history():
 
         return jsonify(error="Failed to send message")
 
+
 @app.route("/test", methods=["GET"])
 def test_col():
     """
@@ -393,6 +400,7 @@ def test_col():
     cf.get_my_peer_info()
 
     return jsonify(message="COL started")
+
 
 @app.route("/api/receive_model", methods=["POST"])
 def receive_model():
@@ -406,13 +414,13 @@ def receive_model():
     # Check if the model is valid
     if not model:
         return jsonify(error="Invalid model")
-    
-    # TODO: Implement the model handling logic here
-    # ...
+
+    cf.handle_received_message(model)
 
     server_logger.info("Model received: %s", model)
 
     return jsonify(message="Model received")
+
 
 def start_server(yacy_settings: dict, host: str, port: int):
     """
@@ -433,6 +441,6 @@ def start_server(yacy_settings: dict, host: str, port: int):
     try:
         app.run(host=host, port=port)
     except Exception as e:
-        server_logger.error(f"An error occurred during starting the server: {e}")
+        server_logger.error("An error occurred during starting the server: %s", e)
     except KeyboardInterrupt:
         server_logger.info("Server stopped.")

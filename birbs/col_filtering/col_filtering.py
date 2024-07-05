@@ -2,37 +2,29 @@
 Collaborative Filtering Implementation
 This code in this section was taken from Krishna Shukla from the following repository:
 https://gitlab.com/ucbooks/dht/-/tree/main?ref_type=heads
+
 The code was modified to fit this project.
 """
 
-# pylint: disable= C0301
+# pylint: disable= C0301, W0201, W0718, R0902, W0719
 
 # Default Libraries
 import os
-import sys
-import math
-import hashlib
-import socket
 import random
-import errno
-import selectors
 import pickle
 import json
 import time
 import threading
 import xml.etree.ElementTree as ET
-from bs4 import BeautifulSoup
 import logging
 
 # Third Party Libraries
 import requests
+from bs4 import BeautifulSoup
 import numpy as np
-import geocoder
 
 # Custom Libraries
-import birbs.col_filtering.helpers as helpers
 from birbs.communication import send_message as send_socket_message
-import birbs.server.server as server
 from birbs.config import ConfigLoader
 
 # Numpy error handling for debugging
@@ -47,20 +39,12 @@ ADD_MESSAGE = "ADD_MESSAGE"
 FAILED_NODE = "FAILED_NODE"
 SEND_MODEL = "SEND_MODEL"
 
+B = 4
+N = 50
+HASH_SIZE = 16
+
 # Initialize the logger
 col_logger = logging.getLogger("COL")
-
-b = 4
-N = 50
-hash_size = 16
-hex_map = {
-    '0': 0, '1': 1, '2': 2, '3': 3, '4': 4,
-    '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
-    'a': 10, 'b': 11, 'c': 12, 'd': 13,
-    'e': 14, 'f': 15
-}
-
-
 
 class COL:
     """
@@ -68,53 +52,61 @@ class COL:
     """
 
     def __init__(self, ip_address, port, hash_):
-        
+
         # Initialize the configuration
         self.config_loader = ConfigLoader()
 
-        # TODO: Most of these variables are not needed without the Pastry implementation
         # Initialize the variables
-        self.node_id = hash_
-        self.ip_address = ip_address
-        self.port = int(port)
-        self.node_state = tuple((self.node_id, self.ip_address, self.port))
-        self.r = [[None for j in range(pow(2, b))] for i in range(hash_size)]
-        self.m = [None for x in range(pow(2, b + 1))]
-        self.l_min = [None for x in range(pow(2, b - 1))]
-        self.l_max = [None for x in range(pow(2, b - 1))]
-        self.main_node = {"ip_address": "localhost", "port": 9090}
-        self.overlay_interval = 20
-        self.heartbeat_interval = 15
-        self.pastry_nodes = []
+        self.initialize_variables(ip_address, port, hash_)
 
-        self.search_queries = []
+    def initialize_variables(self, ip_address, port, hash_):
+        """
+        Initialize the variables
+        """
+        self.lock = threading.RLock()
 
-        self.ht = {}
-        self.delta = 5
-        self.y = None  # The base model of the node
-        self.received_y = []  # Storage for the received models
-        self.xi = None  # Node latent factors
-        self.bi = None  # Node biases
-        self.k = 20
-        self.lr = 0.001
-        self.rp = 1
-        self.p = []
-        self.max_rec = 40
-        self.method = METHOD
-        self.lock = threading.Lock()
+        with self.lock:
+            # Initialize the variables
+            self.node_id = hash_
+            self.ip_address = ip_address
+            self.port = int(port)
+            self.node_state = tuple((self.node_id, self.ip_address, self.port))
+            self.r = [[None for j in range(pow(2, B))] for i in range(HASH_SIZE)]
+            self.m = [None for x in range(pow(2, B + 1))]
+            self.l_min = [None for x in range(pow(2, B - 1))]
+            self.l_max = [None for x in range(pow(2, B - 1))]
+            self.main_node = {"ip_address": "localhost", "port": 9090}
+            self.overlay_interval = 20
+            self.heartbeat_interval = 15
+            self.pastry_nodes = []
+
+            self.search_queries = []
+
+            self.ht = {}
+            self.delta = 5
+            self.y = None  # The base model of the node
+            self.received_y = []  # Storage for the received models
+            self.xi = None  # Node latent factors
+            self.bi = None  # Node biases
+            self.k = 20
+            self.lr = 0.001
+            self.rp = 1
+            self.p = []
+            self.max_rec = 40
+            self.method = METHOD
 
     def load_history(self, path="resources/history/history.json"):
         """
         Load the search history of the node
         """
 
-        try: 
+        try:
             with open(path, "r", encoding="utf-8") as handler:
                 history = json.load(handler)
         except FileNotFoundError:
             print("No search history found")
             return
-        
+
         return history["history"]
 
     def generate_hashes(self, qi):
@@ -211,107 +203,106 @@ class COL:
         Input: None
         Output: node: { "ip_address": ip_address, "port": port, "hash": id}
         """
-        
-        with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as handler:
+
+        with open(
+            "resources/whitelist/whitelist.json", "r", encoding="utf-8"
+        ) as handler:
             whitelist = json.load(handler)
-        
+
         if whitelist:
             peer = random.choice(whitelist["whitelist"])
             return peer
-        
+
         print("No peers in the whitelist")
         return None
 
     def create_dummy_model(self):
-        '''
+        """
         Create a dummy model for testing purposes.
-        '''
-        # Initialize the search queries
-        qi = self.load_history(path="resources/history/dummy_search_history_2.json")
-        # Generate the hashes and normalize the ratings
-        ai = self.generate_hashes(qi)
-        ai = self.normalize_ratings(ai)
+        """
 
-        # Initialize the latent factors and biases
-        y = self.initialize_model(ai, k=self.k)
-        return y
+        with self.lock:
+            # Initialize the search queries
+            qi = self.load_history(path="resources/history/dummy_search_history_2.json")
+            # Generate the hashes and normalize the ratings
+            ai = self.generate_hashes(qi)
+            ai = self.normalize_ratings(ai)
+
+            # Initialize the latent factors and biases
+            y = self.initialize_model(ai, k=self.k)
+            return y
 
     def lrmf_loop(self):
         """
         This function runs the LRMF algorithm.
         """
 
-        # Initialize the search queries
-        qi = self.search_queries
+        with self.lock:
+            # Initialize the search queries
+            qi = self.search_queries
 
-        # Generate the hashes and normalize the ratings
-        ai = self.generate_hashes(qi)
-        ai = self.normalize_ratings(ai)
+            # Generate the hashes and normalize the ratings
+            ai = self.generate_hashes(qi)
+            ai = self.normalize_ratings(ai)
 
-        # Initialize the latent factors and biases
-        self.xi, self.bi = self.initialize_xibi(self.k)
-        self.y = self.initialize_model(ai, k=self.k)
-        self.received_y.append(self.y)
+            # Initialize the latent factors and biases
+            self.xi, self.bi = self.initialize_xibi(self.k)
+            self.y = self.initialize_model(ai, k=self.k)
+            self.received_y.append(self.y)
 
-        quiet = 0
+            quiet = 0
 
-        # Update the model and send it to a peer every delta seconds
-        while True:
-            # Wait for delta seconds
-            time.sleep(self.delta)
+            # Update the model and send it to a peer every delta seconds
+            while True:
+                # Wait for delta seconds
+                time.sleep(self.delta)
 
-            # If no models have been received, increment the quiet counter
-            if len(self.received_y) == 0:
-                quiet += 1
+                # If no models have been received, increment the quiet counter
+                if len(self.received_y) == 0:
+                    quiet += 1
 
-                # If the model has been quiet for 5 cycles, select a peer and send the model
-                if quiet >= 5:
-                    # Select a peer
-                    p = self.select_peer()
+                    # If the model has been quiet for 5 cycles, select a peer and send the model
+                    if quiet >= 5:
+                        # Select a peer
+                        p = self.select_peer()
 
-                    print(f"Selected peer: {p}")
+                        print(f"Selected peer: {p}")
 
-                    # If a peer is selected, send the model
-                    if p:
-                        self.forward(
-                            "SEND_MODEL",
-                            (
-                                p["hash"],
-                                p["ip"],
-                                p["port"],
-                                self.y,
-                                self.node_state,
-                            ),
-                        )
+                        # If a peer is selected, send the model
+                        if p:
+                            self.forward(
+                                "SEND_MODEL",
+                                (
+                                    p["hash"],
+                                    p["ip"],
+                                    p["port"],
+                                    self.y,
+                                    self.node_state,
+                                ),
+                            )
 
-            # If models have been received, update the model and send it to a peer
-            else:
-                # Reset the quiet counter
-                quiet = 0
+                # If models have been received, update the model and send it to a peer
+                else:
+                    # Reset the quiet counter
+                    quiet = 0
 
-                # Update the model with the received models
-                while len(self.received_y) > 0:
-                    # Get the received model
-                    y_hat = self.received_y[0]
+                    # Update the model with the received models
+                    while len(self.received_y) > 0:
+                        # Get the received model
+                        y_hat = self.received_y[0]
 
-                    # Update the model
-                    self.received_y = self.received_y[1:]
+                        # Update the model
+                        self.received_y = self.received_y[1:]
 
-                    # Select a peer to send the model to
-                    p = self.select_peer()
+                        # Select a peer to send the model to
+                        p = self.select_peer()
 
-                    # If a peer is selected, send the model
-                    if p:
-                        self.forward(
-                            "SEND_MODEL",
-                            [
-                                p["hash"],
-                                p["ip"],
-                                p["port"],
-                                y_hat,
-                                self.node_state
-                            ]
-                        )
+                        # If a peer is selected, send the model
+                        if p:
+                            self.forward(
+                                "SEND_MODEL",
+                                [p["hash"], p["ip"], p["port"], y_hat, self.node_state],
+                            )
 
     def lrmf_run(self):
         """
@@ -339,7 +330,7 @@ class COL:
                 [4]:  Y,
                 [5]:  nodeState
         """
-        
+
         # Form the message
         message = {"msg": msg, "data": data}
 
@@ -353,15 +344,14 @@ class COL:
         # Send the message to the peer
         try:
             response = send_socket_message(ip, int(port), message)
-            col_logger.info(f"Response from {ip}:{port}: {response}")
+            col_logger.info("Response from %s:%s: %s", ip, port, response)
         except Exception as e:
-            col_logger.error(f"An error occurred while sending message: {e}")
-        
+            col_logger.error("An error occurred while sending message: %s", e)
+
         # TODO: Remove this
         if False:
             dummy_model = self.create_dummy_model()
             self.on_receive_model(dummy_model)
-        
 
     def predict(self, xi, ai, y, bi):
         """
@@ -369,11 +359,9 @@ class COL:
         """
         local_hashes = list(ai.keys())
 
-
-        # WHEN A NEW SEARCH IS MADE, RUN THE ALGORITHM 
+        # WHEN A NEW SEARCH IS MADE, RUN THE ALGORITHM
         # TAKE THE FIRST PREDICTION AND RETURN ITS LINKS
         # TECHNICALLY SHOULD BE THE LAST AI W
-
 
         url_hash = []
         weights = []
@@ -390,16 +378,17 @@ class COL:
             p.append(url_hash[index])
 
         nonlocal_hashes = []
-        for each_hash in p:
-            if each_hash not in local_hashes:
-                nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
-        if len(nonlocal_hashes) > self.max_rec:
-            nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
+
+        with self.lock:
+            for each_hash in p:
+                if each_hash not in local_hashes:
+                    nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
+            if len(nonlocal_hashes) > self.max_rec:
+                nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
 
         return nonlocal_hashes
-    
-    def update_model_with_bias(self, y, xi, ai, bi, k, lr, rp):
 
+    def update_model_with_bias(self, y, xi, ai, bi, k, lr, rp):
         """
         Update the latent factors using the bias update rule.
         We update Y[0] (the model), ci in the model, xi and bi
@@ -417,8 +406,8 @@ class COL:
         for each_hash in all_ai:
             ratings.append(ai[each_hash])
             if each_hash in y[0]:
-                g.append(y[0][each_hash]['w'])
-                cis.append(y[0][each_hash]['ci'])
+                g.append(y[0][each_hash]["w"])
+                cis.append(y[0][each_hash]["ci"])
             else:
                 g.append(np.random.normal(loc=0.0, scale=1.0, size=k))
                 cis.append(np.random.normal(loc=0.0, scale=1.0))
@@ -435,61 +424,62 @@ class COL:
         for j in range(0, len(all_ai)):
             rating = ratings[j]
             eij = rating - np.matmul(xi, g[j].T) - bi - cis[j]
-            xprime = (1-lr*rp) * xprime + lr * eij * g[j]
-            gprime[j] = (1-lr*rp) * gprime[j] + lr * eij * xi
-            biprime = (1-lr*rp) * biprime + lr * eij
-            cisprime[j] = (1-lr*rp) * cisprime[j] + lr * eij
+            xprime = (1 - lr * rp) * xprime + lr * eij * g[j]
+            gprime[j] = (1 - lr * rp) * gprime[j] + lr * eij * xi
+            biprime = (1 - lr * rp) * biprime + lr * eij
+            cisprime[j] = (1 - lr * rp) * cisprime[j] + lr * eij
 
         # Normalize xprime, biprime by the number of ratings
         # xprime = xprime / len(all_ai)
         # biprime = biprime / len(all_ai)
 
         for each_hash in all_ai:
-            y[0][each_hash]['age'] += 1
-            y[0][each_hash]['w'] = gprime[all_ai.index(each_hash)]
-            y[0][each_hash]['ci'] = cisprime[all_ai.index(each_hash)]
+            y[0][each_hash]["age"] += 1
+            y[0][each_hash]["w"] = gprime[all_ai.index(each_hash)]
+            y[0][each_hash]["ci"] = cisprime[all_ai.index(each_hash)]
 
         return y, xprime, biprime
-    
+
     def receive_models(self):
         """
         Function to retrieve all received models.
         """
 
-        # Retrieving message ids
-        query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/retrieve_message_ids"
-        document = requests.get(query).text
+        with self.lock:
+            # Retrieving message ids
+            query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/retrieve_message_ids"
+            document = requests.get(query, timeout=60).text
 
-        xml_root = ET.fromstring(document)
-        message_ids = [{"id": message.get('id')} for message in xml_root.findall('.//message')]
+            xml_root = ET.fromstring(document)
+            message_ids = [
+                {"id": message.get("id")} for message in xml_root.findall(".//message")
+            ]
 
-        all_models = {}
+            all_models = {}
 
-        # Retrieving messages
-        for message in message_ids:
-            query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/get_message_contents?messageId={message['id']}"
-            document = BeautifulSoup(requests.get(query).text, "html.parser")
-            pairs = document.find(class_='pairs')
-            if pairs:
-                message_data = pairs.find_all('dd')
-                from_ = message_data[0].get_text()
-                to_ = message_data[1].get_text()
-                date = message_data[2].get_text()
-                subject = message_data[3].get_text()
-                message = message_data[4].get_text()
-        
-                # Unpickle the message
-                # message is a string that is pickled
-                # get rid of empty spaces and new lines
-                message = message.replace(" ", "").replace("\n", "")
-                print("Message", message)
-                print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
-                message = pickle.loads(message, encoding="ASCII")
-        
-                # Add the message to the dictionary
-                if subject == "SEND_MODEL":
-                    all_models[from_] = message
-        
+            # Retrieving messages
+            for message in message_ids:
+                query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/get_message_contents?messageId={message['id']}"
+                document = BeautifulSoup(requests.get(query, timeout=60).text, "html.parser")
+                pairs = document.find(class_="pairs")
+                if pairs:
+                    message_data = pairs.find_all("dd")
+                    from_ = message_data[0].get_text()
+                    subject = message_data[3].get_text()
+                    message = message_data[4].get_text()
+
+                    # Unpickle the message
+                    # message is a string that is pickled
+                    # get rid of empty spaces and new lines
+                    message = message.replace(" ", "").replace("\n", "")
+                    print("Message", message)
+                    print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                    message = pickle.loads(message, encoding="ASCII")
+
+                    # Add the message to the dictionary
+                    if subject == "SEND_MODEL":
+                        all_models[from_] = message
+
         return all_models
 
     def on_receive_model(self, model):
@@ -506,88 +496,83 @@ class COL:
             }
         """
 
-        print("Received model")
-        print(self.receive_models())
-        
-        ############################ UPDATE MY OWN MODEL WITH MY NEW SEARCHES ############################
-
-        # Fetch the search history
-        qi = self.search_queries
-
-        # Generate the hashes and normalize the ratings
-        ai = self.generate_hashes(qi)
-        ai = self.normalize_ratings(ai)
-
-        # TODO: This is a temporary fix. 
-        if self.y is None:
-            raise Exception("BU NEDEN EMPTY AMK")
-        
-        # Find the newly added keys
-        # !! we use index 0 because the first index is the model itself, the second index is the history
-        model_keys = list(self.y[0].keys())
-        new_keys = {}
-
-        for key, _ in ai.items():
-            if key not in model_keys:
-                new_keys[key] = ai[key]
-
-        
-        # Initialize the model with the new keys
-        y_new = self.initialize_model(new_keys, self.k)
-        
-        # Merge the models
-        y = self.merge_models(self.y, y_new)
-        
-        ############################ UPDATE MY OWN MODEL WITH THE RECEIVED MODEL ############################
-
-        # Merge the new model with the received model
-        y = self.merge_models(y, model)
-
-        # Update the model with the bias
-        y, xi, bi = self.update_model_with_bias(
-            y, self.xi, ai, self.bi, self.k, self.lr, self.rp
-        )
-
-        # Normalize the latent factors by the length of the ratings
-        # This is because in update step we repeat the multiplication len(ai) times
-        xi = xi / len(list(ai.keys()))
-        bi = bi / len(list(ai.keys()))
-
-        # Make predictions
-        predictions = self.predict(xi, ai, y, bi)
-        print("Predictions: ", predictions)
-        
-        # If predictions are made assign them to the class variable
-        if predictions:
-            self.p = predictions
-
-        # Update the class variables
-        self.y = y
-        self.xi = xi
-        self.bi = bi
-
-        # Add the model to the received models. This will be used in LSFM_Loop
-        self.received_y.append(y)
-
-        # Calculate the error
-        error = self.error_bias(y, xi, ai, bi, self.k, self.rp)
-
-        print("The error is: ", error)
-
-        ########################################## SAVE THE RESULTS ##########################################
-       
-        # Form the path
-        results_path = os.path.join("results", self.node_id + ".json")
-
-        # Save the results
         with self.lock:
+            ############################ UPDATE MY OWN MODEL WITH MY NEW SEARCHES ############################
+
+            # Fetch the search history
+            qi = self.search_queries
+
+            # Generate the hashes and normalize the ratings
+            ai = self.generate_hashes(qi)
+            ai = self.normalize_ratings(ai)
+
+            # TODO: This is a temporary fix.
+            if self.y is None:
+                raise Exception("BU NEDEN EMPTY AMK")
+
+            # Find the newly added keys
+            # !! we use index 0 because the first index is the model itself, the second index is the history
+            model_keys = list(self.y[0].keys())
+            new_keys = {}
+
+            for key, _ in ai.items():
+                if key not in model_keys:
+                    new_keys[key] = ai[key]
+
+            # Initialize the model with the new keys
+            y_new = self.initialize_model(new_keys, self.k)
+
+            # Merge the models
+            y = self.merge_models(self.y, y_new)
+
+            ############################ UPDATE MY OWN MODEL WITH THE RECEIVED MODEL ############################
+
+            # Merge the new model with the received model
+            y = self.merge_models(y, model)
+
+            # Update the model with the bias
+            y, xi, bi = self.update_model_with_bias(
+                y, self.xi, ai, self.bi, self.k, self.lr, self.rp
+            )
+
+            # Normalize the latent factors by the length of the ratings
+            # This is because in update step we repeat the multiplication len(ai) times
+            xi = xi / len(list(ai.keys()))
+            bi = bi / len(list(ai.keys()))
+
+            # Make predictions
+            predictions = self.predict(xi, ai, y, bi)
+            print("Predictions: ", predictions)
+
+            # If predictions are made assign them to the class variable
+            if predictions:
+                self.p = predictions
+
+            # Update the class variables
+            self.y = y
+            self.xi = xi
+            self.bi = bi
+
+            # Add the model to the received models. This will be used in LSFM_Loop
+            self.received_y.append(y)
+
+            # Calculate the error
+            error = self.error_bias(y, xi, ai, bi, self.k, self.rp)
+
+            print("The error is: ", error)
+
+            ########################################## SAVE THE RESULTS ##########################################
+
+            # Form the path
+            results_path = os.path.join("results", self.node_id + ".json")
+
             if not os.path.exists(results_path):
                 # create directory
                 os.makedirs(os.path.dirname(results_path), exist_ok=True)
-                with open(results_path, "w+") as handler:
+                with open(results_path, "w+", encoding="utf-8") as handler:
                     handler.write(json.dumps({}))
 
-            with open(results_path, "r") as handler:
+            with open(results_path, "r", encoding="utf-8") as handler:
 
                 file_content = handler.read().strip()
 
@@ -598,7 +583,7 @@ class COL:
             else:
                 node_results[self.method] = [error]
 
-            with open(results_path, "w+") as handler:
+            with open(results_path, "w+", encoding="utf-8") as handler:
                 handler.write(json.dumps(node_results))
                 handler.flush()
 
@@ -657,7 +642,7 @@ class COL:
         y_k = {}
         for element in u:
             y_k[element] = {"age": 0, "w": None, "ci": None}
-        
+
         historyk = y[1]
 
         for j in u:
@@ -680,10 +665,10 @@ class COL:
                     y_k[j]["age"] = y_hat[0][j]["age"]
                     y_k[j]["w"] = y_hat[0][j]["w"]
                     y_k[j]["ci"] = y_hat[0][j]["ci"]
-        
+
         return (y_k, historyk)
 
-    #start function
+    # start function
     def start(self):
         """
         Function to start the Collaborative Filtering node.
@@ -693,8 +678,3 @@ class COL:
         self.search_queries = self.load_history()
 
         self.lrmf_run()
-
-        
-
-
-        

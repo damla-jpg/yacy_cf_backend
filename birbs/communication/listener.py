@@ -1,15 +1,17 @@
-'''
+"""
 This module is responsible for handling the communication between the peers in the network.
-'''
+"""
+
+# pylint: disable=W0718
 
 # Default imports
 import socket
 import threading
 import logging
-import requests
+import pickle
 
 # Third party imports
-import pickle
+import requests
 
 # Custom imports
 from birbs.config import ConfigLoader
@@ -17,12 +19,13 @@ from birbs.config import ConfigLoader
 NUM_CONNECTIONS = 5
 com_logger = logging.getLogger("Communication")
 
-class Listener:
-    '''
-    This class listens for incoming messages from the network.
-    '''
 
-    def __init__(self, ip : str, port : int):
+class Listener:
+    """
+    This class listens for incoming messages from the network.
+    """
+
+    def __init__(self, ip: str, port: int):
         self.ip = ip
         self.port = port
         self.server_socket = None
@@ -31,13 +34,13 @@ class Listener:
         # Initialize the configuration
         self.config_loader = ConfigLoader()
 
-    def handle_client(self, client_socket : socket.socket):
-        '''
+    def handle_client(self, client_socket: socket.socket):
+        """
         This function handles the incoming messages from the network.
-        '''
-        
+        """
+
         # Initialize the variables
-        message : bytes = b""
+        message: bytes = b""
 
         com_logger.info("Handling the client...")
 
@@ -45,12 +48,10 @@ class Listener:
             while not self.stop_signal.is_set():
                 # Receive the message
                 chunk = client_socket.recv(1024)
-                
+
                 # If the message is empty, break the loop
                 if not chunk:
                     break
-                
-                com_logger.info(f"Received chunk: {chunk}")
 
                 # Append the chunk to the message
                 message += chunk
@@ -58,33 +59,37 @@ class Listener:
         finally:
             # Send confirmation
             client_socket.send(pickle.dumps("Message received."))
-            
+
             # Close the socket
             client_socket.close()
 
-        message = pickle.loads(message)   
+        message = pickle.loads(message)
 
         # Send the message to the backend
         # Get the flask server IP and port
-        ip = self.config_loader.flask_settings['host']
-        port = self.config_loader.flask_settings['port']
+        ip = self.config_loader.flask_settings["host"]
+        port = self.config_loader.flask_settings["port"]
 
         # Send the message to the server
         try:
-            response = requests.post(f"http://{ip}:{port}/api/receive_model", data=message)
-            com_logger.info(f"Message sent to the backend. Response: {response}")
+            response = requests.post(
+                f"http://{ip}:{port}/api/receive_model", data=message, timeout=5
+            )
+            com_logger.info("Message sent to the backend. Response: %s", response)
         except Exception as e:
-            com_logger.error(f"An error occurred while sending the message to the server: {e}")
-            
+            com_logger.error(
+                "An error occurred while sending the message to the server: %s", e
+            )
+
         # Log the message
-        com_logger.info(f"Received message: {message}")
+        com_logger.info("Received message: %s", message)
 
         com_logger.info("Client handled.")
 
     def stop(self):
-        '''
+        """
         This function stops the socket listener.
-        '''
+        """
 
         self.stop_signal.set()
 
@@ -92,25 +97,27 @@ class Listener:
             self.server_socket.close()
 
     def start(self):
-        '''
+        """
         This function starts the socket listener.
-        '''
+        """
 
         # Create a new thread for listening
-        listener_thread = threading.Thread(target=self.listen, args=(self.ip, self.port))
+        listener_thread = threading.Thread(
+            target=self.listen, args=(self.ip, self.port)
+        )
         listener_thread.start()
 
-    def listen(self, ip : str, port : int):
-        '''
+    def listen(self, ip: str, port: int):
+        """
         This function listens for incoming messages from the network.
-        '''
+        """
 
         if not ip or not port:
             com_logger.error("Invalid IP or port.")
             return
 
         try:
-            com_logger.info(f"Trying to listen on {ip}:{port}...")
+            com_logger.info("Trying to listen on %s:%s", ip, port)
 
             # Create a socket
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -127,28 +134,34 @@ class Listener:
             # Listen for incoming connections
             self.server_socket.listen(NUM_CONNECTIONS)
         except Exception as e:
-            com_logger.error(f"An error occurred during initializing the socket: {e}")
+            com_logger.error("An error occurred during initializing the socket: %s", e)
             if self.server_socket:
                 self.server_socket.close()
-            
+
             com_logger.info("Quitting the socket listener...")
             return
-        
+
         # Accept incoming connections, main thread loop
         while not self.stop_signal.is_set():
             try:
                 # Accept the connection (blocking call, waits for incoming connections
-                # if there are not connections the program will be blocked here till a 
+                # if there are not connections the program will be blocked here till a
                 # connection is established)
                 client_socket, client_address = self.server_socket.accept()
-                
-                com_logger.info(f"Connection from {client_address} has been established.")
+
+                com_logger.info(
+                    "Connection from %s has been established.", client_address
+                )
 
                 # Start a new thread to handle the connection
-                thread = threading.Thread(target=self.handle_client, args=(client_socket,))
+                thread = threading.Thread(
+                    target=self.handle_client, args=(client_socket,)
+                )
                 thread.start()
             except Exception as e:
-                com_logger.error(f"An error occurred during accepting the connection: {e}")
+                com_logger.error(
+                    "An error occurred during accepting the connection: %s", {e}
+                )
                 break
             except KeyboardInterrupt:
                 com_logger.info("Listener stopped.")
