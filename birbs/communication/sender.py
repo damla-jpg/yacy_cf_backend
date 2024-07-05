@@ -63,3 +63,11 @@ def send_message(ip: str, port: int, message: str | dict):
             client_socket.close()
 
     return response
+
+if __name__ == "__main__":
+    # Test the send_message function
+    IP = "80.57.135.211"
+    PORT = 8191
+    message = {"msg": "test", "data": "test"}
+
+    response = send_message(IP, PORT, message)
