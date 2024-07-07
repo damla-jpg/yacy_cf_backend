@@ -144,10 +144,6 @@ We welcome contributions from the community. To contribute:
 4. Push to the branch (`git push origin feature-branch`).
 5. Create a new Pull Request.
 
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
 For any questions or support, please open an issue on the GitHub repository or contact the project maintainers directly.
@@ -155,3 +151,10 @@ For any questions or support, please open an issue on the GitHub repository or c
 ---
 
 Thank you for using and contributing to the Collaborative Filtering Integration to the YaCy Decentralized Search Engine. Together, we can enhance the power of decentralized search!
+
+## Acknowledgements
+- Collabrative Filtering Algorithm that has been used and altered in this project is from Krishna Shukla and can be found from
+
+```sh
+https://gitlab.com/ucbooks/dht/-/tree/main?ref_type=heads
+```
