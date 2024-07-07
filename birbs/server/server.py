@@ -354,6 +354,17 @@ def upload():
 #                                           COL Integration                                                #
 ############################################################################################################
 
+@app.route("/api/fetch_predictions", methods=["GET"])
+def fetch_predictions():
+    """
+    This function fetches the predictions from the COL.
+    """
+
+    if COL_INTEGRATION:
+        predictions = COL_INTEGRATION.fetch_predictions()
+        return jsonify(predictions)
+    else:
+        return jsonify(error="COL not initialized")
 
 @app.route("/api/share_history", methods=["POST"])
 def share_history():

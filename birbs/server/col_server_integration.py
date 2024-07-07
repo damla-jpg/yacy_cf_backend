@@ -115,3 +115,23 @@ class COLServerIntegration:
         else:
             # ...
             pass
+    
+    def fetch_predictions(self):
+        """
+        This function fetches the predictions from the COL.
+        """
+
+        # Check if col is initialized
+        if self.col is None:
+            col_integration_logger.error("COL is not initialized")
+            return
+
+        # Fetch the predictions
+        predictions = self.col.p
+
+        # Format it as a json response
+        response = {
+            "predictions": predictions
+        }
+
+        return response
