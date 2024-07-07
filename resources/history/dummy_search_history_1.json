@@ -139,16 +139,6 @@
                 }
             ],
             "total_frequency": 5
-        },
-        {
-            "query": "google",
-            "results": [
-                {
-                    "link": "https://google-earth.softonic.se/android",
-                    "frequency": 1
-                }
-            ],
-            "total_frequency": 1
         }
     ]
 }
