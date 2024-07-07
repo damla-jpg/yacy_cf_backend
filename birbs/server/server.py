@@ -408,16 +408,25 @@ def receive_model():
     This function receives the model.
     """
 
+    server_logger.info("Receiving model from listener...")
+
     # Get the model from the request body, the model is a pickle
     model = fl.request.data
+
+    model = pickle.loads(model)
 
     # Check if the model is valid
     if not model:
         server_logger.error("Couldn't receive the model from the request (This request is sent from listener.py). Model: %s", model)
         return jsonify(error="Invalid model")
 
-    server_logger.info("Model received: %s", model)
+    server_logger.info("Model received")
 
+    if COL_INTEGRATION:
+        server_logger.info("Forwarding the received model to COL integration...")
+        COL_INTEGRATION.handle_received_message(model)
+
+    server_logger.info("Model Forwarded")
     return jsonify(message="Model received")
 
 

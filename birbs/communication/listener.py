@@ -69,10 +69,15 @@ class Listener:
 
         # Send the message to the server
         try:
-            response = requests.post(
-                f"http://{ip}:{port}/api/receive_model", data=message, timeout=60
-            )
-            com_logger.info("Message sent to the backend. Response: %s", response)
+            if not message:
+                com_logger.error("Empty message received.")
+            else:
+                temp_message = pickle.dumps(message)
+
+                response = requests.post(
+                    f"http://{ip}:{port}/api/receive_model", data=temp_message, timeout=60
+                )
+                com_logger.info("Message sent to the backend. Response: %s", response)
         except Exception as e:
             com_logger.error(
                 "An error occurred while sending the message to the server: %s", e
