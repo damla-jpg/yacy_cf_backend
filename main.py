@@ -171,7 +171,9 @@ class Birbs:
         for file in os.listdir("./resources/logs"):
             if file.endswith(".log"):
                 try:
-                    os.remove(f"./resources/logs/{file}")
+                    path = f"./resources/logs/{file}"
+                    if path != self.logger_rpath:
+                        os.remove(path)
                 except PermissionError:
                     # If the file is in use, skip it
                     pass
