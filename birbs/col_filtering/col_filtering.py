@@ -363,6 +363,8 @@ class COL:
         """
         This function calls the on_receive_model function from the queue while locking the model.
         """
+        #TODO: REMOVE TIHS
+        import traceback
 
         while True:
             time.sleep(self.delta)
@@ -374,6 +376,7 @@ class COL:
                 with self.lock:
                     col_logger.info("Received a model from the queue")
                     col_logger.info("Calling the on_receive_model function")
+                    col_logger.info("Model with type: %s and data: %s", type(recv_model), recv_model)
 
                     # Call the on_receive_model function
                     self.on_receive_model(recv_model)
@@ -381,6 +384,7 @@ class COL:
                 col_logger.error(
                     "An error occurred during the model receive loop: %s", e
                 )
+                col_logger.error(traceback.format_exc())
 
     def forward(self, msg, data):
         """
@@ -553,6 +557,12 @@ class COL:
                 history: []
             }
         """
+
+        # inc values are the target node's values a.k.a me :D
+        inc_hash = model[0]
+        inc_ip = model[1]
+        inc_port = model[2]
+        model = model[3]
 
         with self.lock:
             ############################ UPDATE MY OWN MODEL WITH MY NEW SEARCHES ############################
