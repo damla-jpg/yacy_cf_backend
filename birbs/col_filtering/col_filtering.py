@@ -562,8 +562,8 @@ class COL:
         with self.lock:
             ############################ UPDATE MY OWN MODEL WITH MY NEW SEARCHES ############################
 
-            # Fetch the search history
-            qi = self.search_queries
+            # Load the new search queries
+            qi = self.load_history()
 
             # Generate the hashes and normalize the ratings
             ai = self.generate_hashes(qi)

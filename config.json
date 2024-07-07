@@ -1,7 +1,7 @@
 {
     "yacy": {
-        "username": "",
-        "password": "",
+        "username": "test-123",
+        "password": "selin1234",
         "port": 8090
     },
     "flask": {
@@ -9,7 +9,11 @@
         "port": 3001
     },
     "socket": {
-        "host": "localhost",
-        "port": 3002
+        "host": "0.0.0.0",
+        "port": 8190
+    },
+    "debug":{
+        "only_listen": false
     }
 }
+
