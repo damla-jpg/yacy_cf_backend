@@ -86,8 +86,6 @@ class COLServerIntegration:
         """
         This function handles the received message.
         """
-        # Parse the message
-        message = pickle.loads(message)
 
         # Fetch the message type and data
         message_type = message["msg"]
