@@ -29,6 +29,7 @@ auth = HTTPDigestAuth()
 MY_DIGEST_USERNAME = None
 MY_DIGEST_PASSWORD = None
 USERPORT = None
+COL_INTEGRATION = None
 
 server_logger = logging.getLogger("Server")
 
@@ -397,7 +398,6 @@ def test_col():
     """
     This function tests the COL.
     """
-    cf.get_my_peer_info()
 
     return jsonify(message="COL started")
 
@@ -415,14 +415,12 @@ def receive_model():
     if not model:
         return jsonify(error="Invalid model")
 
-    cf.handle_received_message(model)
-
     server_logger.info("Model received: %s", model)
 
     return jsonify(message="Model received")
 
 
-def start_server(yacy_settings: dict, host: str, port: int):
+def start_server(yacy_settings: dict, host: str, port: int, col_int: cf.COLServerIntegration):
     """
     This function starts the server.
     """
@@ -433,12 +431,14 @@ def start_server(yacy_settings: dict, host: str, port: int):
         return
 
     # Set the global variables
-    global MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD, USERPORT
+    global MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD, USERPORT, COL_INTEGRATION
     MY_DIGEST_USERNAME = yacy_settings["username"]
     MY_DIGEST_PASSWORD = yacy_settings["password"]
     USERPORT = yacy_settings["port"]
+    COL_INTEGRATION = col_int
 
     try:
+        # Start the server
         app.run(host=host, port=port)
     except Exception as e:
         server_logger.error("An error occurred during starting the server: %s", e)

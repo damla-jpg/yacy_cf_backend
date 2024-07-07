@@ -1,17 +1,21 @@
 """
 This is the main file of the project. It is the entry point of the project.
 """
+# pylint: disable=W0718, C0301
 
 # Default imports
 import os
 import sys
 import logging
 import time
+import json
 
 # Custom imports
 from birbs.server import start_server
 from birbs.communication import Listener
 from birbs.config import ConfigLoader
+import birbs.server.server as server
+import birbs.server.col_server_integration as col_server_integration
 
 
 class Birbs:
@@ -28,6 +32,7 @@ class Birbs:
         self.listener = None
         self.logger = None
         self.run_socket_listener = run_socket_listener
+        self.col_integration = None
 
         # Initialize the logger
         self.logger_rpath = self.init_logger()
@@ -58,10 +63,10 @@ class Birbs:
 
         return f"./resources/logs/server_log_{current_time}.log"
 
-    def start(self):
-        """
-        This function runs the server and the socket listener.
-        """
+    def start_socket_listener(self):
+        '''
+        This function starts the socket listener.
+        '''
 
         # Try to start the socket listener
         try:
@@ -77,12 +82,32 @@ class Birbs:
                 self.listener.start()
 
         except Exception as e:
+            self.logger.error("An error occurred during initializing the socket thread: %s", e)
+
+            # Stop the server and the socket listener
+            self.stop()
+
+    def start_col_server_integration(self):
+        '''
+        This function starts the COL server integration.
+        '''
+
+        # Try to start the COL server integration
+        try:
+            self.col_integration = col_server_integration.COLServerIntegration()
+            self.col_integration.start()
+        except Exception as e:
             self.logger.error(
-                f"An error occurred during initializing the socket thread: {e}"
+                "An error occurred during initializing the COL server integration: %s", e
             )
 
             # Stop the server and the socket listener
             self.stop()
+
+    def start_server(self):
+        '''
+        This function starts the server.
+        '''
 
         # Try to start the server
         try:
@@ -93,11 +118,32 @@ class Birbs:
                 self.config_loader.yacy_settings,
                 self.config_loader.flask_settings["host"],
                 self.config_loader.flask_settings["port"],
+                self.col_integration,
             )
 
             self.logger.info("Quitting the server...")
         except Exception as e:
-            self.logger.error(f"An error occurred during starting the server: {e}")
+            self.logger.error("An error occurred during starting the server: %s", e)
+
+    def start(self):
+        """
+        This function runs the server and the socket listener.
+        """
+
+        # Clear the logs
+        choice = input("Do you want to clear the logs? (y/n): ")
+
+        if choice.lower() == "y":
+            self.clear_logs()
+
+        # Start the socket listener
+        self.start_socket_listener()
+
+        # Start the COL server integration
+        self.start_col_server_integration()
+
+        # Start the server
+        self.start_server()
 
         self.logger.info("Quitting program...")
 
@@ -116,6 +162,21 @@ class Birbs:
         # Exit the program
         os._exit(0)
 
+    def clear_logs(self):
+        """
+        This function clears the logs.
+        """
+
+        # Delete the logs in the logs directory
+        for file in os.listdir("./resources/logs"):
+            if file.endswith(".log"):
+                try:
+                    os.remove(f"./resources/logs/{file}")
+                except PermissionError:
+                    # If the file is in use, skip it
+                    pass
+                except Exception as e:
+                    self.logger.error("An error occurred during deleting the log file: %s", e)
 
 if __name__ == "__main__":
     # Initialize the Birbs class

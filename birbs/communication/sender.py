@@ -48,11 +48,6 @@ def send_message(ip: str, port: int, message: str | dict):
 
         sender_logger.info("Message sent")
 
-        # Receive the response
-        response = pickle.loads(client_socket.recv(1024))
-
-        sender_logger.info("Received response: %s")
-
         # Close the socket
         client_socket.close()
     except Exception as e:

@@ -57,9 +57,6 @@ class Listener:
                 message += chunk
 
         finally:
-            # Send confirmation
-            # client_socket.send(pickle.dumps("Message received."))
-
             # Close the socket
             client_socket.close()
 

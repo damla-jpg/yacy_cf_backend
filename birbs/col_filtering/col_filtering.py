@@ -17,6 +17,7 @@ import time
 import threading
 import xml.etree.ElementTree as ET
 import logging
+import queue
 
 # Third Party Libraries
 import requests
@@ -45,6 +46,7 @@ HASH_SIZE = 16
 
 # Initialize the logger
 col_logger = logging.getLogger("COL")
+
 
 class COL:
     """
@@ -80,7 +82,7 @@ class COL:
             self.heartbeat_interval = 15
             self.pastry_nodes = []
 
-            self.search_queries = []
+            self.search_queries = self.load_history()
 
             self.ht = {}
             self.delta = 5
@@ -94,6 +96,8 @@ class COL:
             self.p = []
             self.max_rec = 40
             self.method = METHOD
+
+            self.queue = queue.Queue()
 
     def load_history(self, path="resources/history/history.json"):
         """
@@ -250,73 +254,116 @@ class COL:
             self.y = self.initialize_model(ai, k=self.k)
             self.received_y.append(self.y)
 
-            quiet = 0
+        # Initialize the quiet counter
+        quiet = 0
 
-            # Update the model and send it to a peer every delta seconds
-            while True:
-                # Wait for delta seconds
-                time.sleep(self.delta)
+        # Update the model and send it to a peer every delta seconds
+        while True:
+            # Wait for delta seconds
+            time.sleep(self.delta)
 
-                # If no models have been received, increment the quiet counter
-                if len(self.received_y) == 0:
-                    quiet += 1
+            try:
+                # Select a peer
+                p = self.select_peer()
 
-                    # If the model has been quiet for 5 cycles, select a peer and send the model
-                    if quiet >= 5:
-                        # Select a peer
-                        p = self.select_peer()
+                # Initialize the payload
+                payload = None
 
-                        print(f"Selected peer: {p}")
+                if p is None:
+                    col_logger.warning("No peers found")
+                    continue
 
-                        # If a peer is selected, send the model
-                        if p:
-                            self.forward(
-                                "SEND_MODEL",
-                                (
-                                    p["hash"],
-                                    p["ip"],
-                                    p["port"],
-                                    self.y,
-                                    self.node_state,
-                                ),
-                            )
+                print(f"Selected peer: {p}")
 
-                # If models have been received, update the model and send it to a peer
-                else:
-                    # Reset the quiet counter
-                    quiet = 0
+                with self.lock:
+                    # If no models have been received, increment the quiet counter
+                    if len(self.received_y) == 0:
+                        # Increment the quiet counter
+                        quiet += 1
 
-                    # Update the model with the received models
-                    while len(self.received_y) > 0:
-                        # Get the received model
-                        y_hat = self.received_y[0]
+                        # If the model has been quiet for 5 cycles, select a peer and send the model
+                        if quiet >= 5:
+                            # Construct the payload
+                            payload = [
+                                p["hash"],
+                                p["ip"],
+                                p["port"],
+                                self.y,
+                                self.node_state,
+                            ]
 
-                        # Update the model
-                        self.received_y = self.received_y[1:]
+                    # If models have been received, update the model and send it to a peer
+                    else:
+                        # Reset the quiet counter
+                        quiet = 0
 
-                        # Select a peer to send the model to
-                        p = self.select_peer()
+                        # Update the model with the received models
+                        while len(self.received_y) > 0:
+                            # Get the received model
+                            y_hat = self.received_y[0]
 
-                        # If a peer is selected, send the model
-                        if p:
-                            self.forward(
-                                "SEND_MODEL",
-                                [p["hash"], p["ip"], p["port"], y_hat, self.node_state],
-                            )
+                            # Update the model
+                            self.received_y = self.received_y[1:]
+
+                            # Construct the payload
+                            payload = [
+                                p["hash"],
+                                p["ip"],
+                                p["port"],
+                                y_hat,
+                                self.node_state,
+                            ]
+
+                if payload is not None:
+                    self.forward(
+                        "SEND_MODEL",
+                        payload,
+                    )
+            except Exception as e:
+                col_logger.error("An error occurred during the LRMF loop: %s", e)
 
     def lrmf_run(self):
         """
         This function runs the LRMF thread
         """
 
-        # Start the LRMF thread
+        # Init the LRMF thread
         lrmf_thread = threading.Thread(target=self.lrmf_loop)
 
         # Set the thread as a daemon (will close when the main thread closes)
         lrmf_thread.daemon = True
 
+        # Init the receive model thread
+        receive_model_thread = threading.Thread(target=self.model_receive_loop)
+
+        # Set the thread as a daemon (will close when the main thread closes)
+        receive_model_thread.daemon = True
+
         # Start the LRMF thread
         lrmf_thread.start()
+
+        # Start the receive model thread
+        receive_model_thread.start()
+
+    def model_receive_loop(self):
+        """
+        This function calls the on_receive_model function from the queue while locking the model.
+        """
+
+        while True:
+            time.sleep(self.delta)
+
+            try:
+                # Get the message from the queue
+                recv_model = self.queue.get()
+
+                with self.lock:
+                    # Call the on_receive_model function
+                    self.on_receive_model(recv_model)
+            except Exception as e:
+                col_logger.error(
+                    "An error occurred during the model receive loop: %s", e
+                )
 
     def forward(self, msg, data):
         """
@@ -343,15 +390,9 @@ class COL:
 
         # Send the message to the peer
         try:
-            response = send_socket_message(ip, int(port), message)
-            col_logger.info("Response from %s:%s: %s", ip, port, response)
+            _ = send_socket_message(ip, int(port), message)
         except Exception as e:
             col_logger.error("An error occurred while sending message: %s", e)
-
-        # TODO: Remove this
-        if False:
-            dummy_model = self.create_dummy_model()
-            self.on_receive_model(dummy_model)
 
     def predict(self, xi, ai, y, bi):
         """
@@ -460,7 +501,9 @@ class COL:
             # Retrieving messages
             for message in message_ids:
                 query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/get_message_contents?messageId={message['id']}"
-                document = BeautifulSoup(requests.get(query, timeout=60).text, "html.parser")
+                document = BeautifulSoup(
+                    requests.get(query, timeout=60).text, "html.parser"
+                )
                 pairs = document.find(class_="pairs")
                 if pairs:
                     message_data = pairs.find_all("dd")
@@ -505,10 +548,6 @@ class COL:
             # Generate the hashes and normalize the ratings
             ai = self.generate_hashes(qi)
             ai = self.normalize_ratings(ai)
-
-            # TODO: This is a temporary fix.
-            if self.y is None:
-                raise Exception("BU NEDEN EMPTY AMK")
 
             # Find the newly added keys
             # !! we use index 0 because the first index is the model itself, the second index is the history
@@ -673,8 +712,5 @@ class COL:
         """
         Function to start the Collaborative Filtering node.
         """
-
-        # Initialize the Collaborative Filtering node
-        self.search_queries = self.load_history()
 
         self.lrmf_run()
