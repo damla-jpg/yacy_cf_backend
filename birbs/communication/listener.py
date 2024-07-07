@@ -70,7 +70,7 @@ class Listener:
         # Send the message to the server
         try:
             response = requests.post(
-                f"http://{ip}:{port}/api/receive_model", data=message, timeout=5
+                f"http://{ip}:{port}/api/receive_model", data=message, timeout=60
             )
             com_logger.info("Message sent to the backend. Response: %s", response)
         except Exception as e:

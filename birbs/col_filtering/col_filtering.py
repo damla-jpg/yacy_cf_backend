@@ -108,7 +108,6 @@ class COL:
             with open(path, "r", encoding="utf-8") as handler:
                 history = json.load(handler)
         except FileNotFoundError:
-            print("No search history found")
             return
 
         return history["history"]
@@ -217,7 +216,6 @@ class COL:
             peer = random.choice(whitelist["whitelist"])
             return peer
 
-        print("No peers in the whitelist")
         return None
 
     def create_dummy_model(self):
@@ -273,7 +271,7 @@ class COL:
                     col_logger.warning("No peers found")
                     continue
 
-                print(f"Selected peer: {p}")
+                col_logger.info("Selected peer: %s", p)
 
                 with self.lock:
                     # If no models have been received, increment the quiet counter
@@ -281,8 +279,12 @@ class COL:
                         # Increment the quiet counter
                         quiet += 1
 
+                        col_logger.info("No models received, incrementing the quiet counter: %s", quiet)
+
                         # If the model has been quiet for 5 cycles, select a peer and send the model
                         if quiet >= 5:
+                            col_logger.info("Sending the model to the peer: %s after %s quiet cycles", p, quiet)
+
                             # Construct the payload
                             payload = [
                                 p["hash"],
@@ -297,6 +299,8 @@ class COL:
                         # Reset the quiet counter
                         quiet = 0
 
+                        col_logger.info("Models received, updating the model")
+
                         # Update the model with the received models
                         while len(self.received_y) > 0:
                             # Get the received model
@@ -304,6 +308,8 @@ class COL:
 
                             # Update the model
                             self.received_y = self.received_y[1:]
+
+                            col_logger.info("Sending the received model to the peer: %s", p)
 
                             # Construct the payload
                             payload = [
@@ -315,10 +321,15 @@ class COL:
                             ]
 
                 if payload is not None:
+                    col_logger.info("Forwarding the payload")
+
                     self.forward(
                         "SEND_MODEL",
                         payload,
                     )
+                else:
+                    col_logger.info("No payload to forward")
+
             except Exception as e:
                 col_logger.error("An error occurred during the LRMF loop: %s", e)
 
@@ -358,6 +369,9 @@ class COL:
                 recv_model = self.queue.get()
 
                 with self.lock:
+                    col_logger.info("Received a model from the queue")
+                    col_logger.info("Calling the on_receive_model function")
+
                     # Call the on_receive_model function
                     self.on_receive_model(recv_model)
             except Exception as e:
@@ -515,8 +529,6 @@ class COL:
                     # message is a string that is pickled
                     # get rid of empty spaces and new lines
                     message = message.replace(" ", "").replace("\n", "")
-                    print("Message", message)
-                    print("\n\n\n\n\n\n\n\n\n\n\n\n\n")
                     message = pickle.loads(message, encoding="ASCII")
 
                     # Add the message to the dictionary
@@ -581,7 +593,6 @@ class COL:
 
             # Make predictions
             predictions = self.predict(xi, ai, y, bi)
-            print("Predictions: ", predictions)
 
             # If predictions are made assign them to the class variable
             if predictions:
@@ -597,8 +608,6 @@ class COL:
 
             # Calculate the error
             error = self.error_bias(y, xi, ai, bi, self.k, self.rp)
-
-            print("The error is: ", error)
 
             ########################################## SAVE THE RESULTS ##########################################
 

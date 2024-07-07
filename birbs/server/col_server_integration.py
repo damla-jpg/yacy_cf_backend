@@ -98,9 +98,12 @@ class COLServerIntegration:
             col_integration_logger.error("COL is not initialized")
             return
 
+        col_integration_logger.info("Message type: %s", message_type)
+
         # Handle the message based on the message type
         if message_type == "SEND_MODEL":
             self.col.queue.put(data)
+            col_integration_logger.info("Model is added to the queue")
 
         elif message_type == "SEND_DATA":
             # ...
