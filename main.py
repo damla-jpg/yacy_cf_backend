@@ -8,13 +8,11 @@ import os
 import sys
 import logging
 import time
-import json
 
 # Custom imports
 from birbs.server import start_server
 from birbs.communication import Listener
 from birbs.config import ConfigLoader
-import birbs.server.server as server
 import birbs.server.col_server_integration as col_server_integration
 
 

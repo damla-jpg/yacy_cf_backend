@@ -350,8 +350,11 @@ class COL:
         # Set the thread as a daemon (will close when the main thread closes)
         receive_model_thread.daemon = True
 
+        only_listen = self.config_loader.debug_settings["only_listen"]
+        
         # Start the LRMF thread
-        lrmf_thread.start()
+        if not only_listen:
+            lrmf_thread.start()
 
         # Start the receive model thread
         receive_model_thread.start()

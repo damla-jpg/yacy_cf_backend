@@ -413,6 +413,7 @@ def receive_model():
 
     # Check if the model is valid
     if not model:
+        server_logger.error("Couldn't receive the model from the request (This request is sent from listener.py). Model: %s", model)
         return jsonify(error="Invalid model")
 
     server_logger.info("Model received: %s", model)

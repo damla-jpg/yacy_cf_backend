@@ -20,6 +20,7 @@ class ConfigLoader:
         self.yacy_settings = None
         self.flask_settings = None
         self.socket_settings = None
+        self.debug_settings = None
 
         config_logger.info("ConfigLoader initialized, loading configuration...")
 
@@ -64,3 +65,4 @@ class ConfigLoader:
         self.yacy_settings = self.config["yacy"]
         self.flask_settings = self.config["flask"]
         self.socket_settings = self.config["socket"]
+        self.debug_settings = self.config["debug"]
