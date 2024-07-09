@@ -462,7 +462,10 @@ class COL:
             for i, each_hash in enumerate(p):
                 if each_hash not in local_hashes:
                     nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
-                    nonlocal_links.append(bytes.fromhex(links[i]).decode("utf-8"))
+                    unhashed_links = []
+                    for link in links[i]:
+                        unhashed_links.append(bytes.fromhex(link).decode("utf-8"))
+                    nonlocal_links.append(unhashed_links)
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
                 nonlocal_links = nonlocal_links[0 : self.max_rec]
