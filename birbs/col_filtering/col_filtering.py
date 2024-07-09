@@ -465,10 +465,13 @@ class COL:
             for each_hash in p:
                 if each_hash not in local_hashes:
                     nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
-                    nonlocal_links.append([bytes.fromhex(link) for link in predicted_links[each_hash]])
+                    nonlocal_links.append([bytes.fromhex(link).decode("utf-8") for link in predicted_links[each_hash]])
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
                 nonlocal_links = nonlocal_links[0 : self.max_rec]
+        
+        col_logger.info("Predictions: %s", nonlocal_hashes)
+        col_logger.info("Links: %s", nonlocal_links)
 
         return nonlocal_hashes, nonlocal_links
 
