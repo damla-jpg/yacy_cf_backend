@@ -730,6 +730,7 @@ class COL:
         historyk = y[1]
 
         for j in u:
+            unhashed_j = bytes.fromhex(j).decode("utf-8")
             if j in y[0] and j in y_hat[0]:
                 if y_hat[0][j]["age"] != 0:
                     w = y_hat[0][j]["age"] / (y[0][j]["age"] + y_hat[0][j]["age"])
@@ -737,22 +738,27 @@ class COL:
                     y_k[j]["w"] = (1 - w) * y[0][j]["w"] + w * y_hat[0][j]["w"]
                     y_k[j]["ci"] = (1 - w) * y[0][j]["ci"] + w * y_hat[0][j]["ci"]
                     y_k[j]["links"] = list(set(list(y[0][j]["links"]) + list(y_hat[0][j]["links"])))
+                    # log the links per j
+                    col_logger.info("CONDITION 1: Links for %s: %s", unhashed_j, y_k[j]["links"])
                 else:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
                     y_k[j]["ci"] = y[0][j]["ci"]
                     y_k[j]["links"] = y[0][j]["links"]
+                    col_logger.info("CONDITION 2: Links for %s: %s", unhashed_j, y_k[j]["links"])
             else:
                 if j in y[0]:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
                     y_k[j]["ci"] = y[0][j]["ci"]
                     y_k[j]["links"] = y[0][j]["links"]
+                    col_logger.info("CONDITION 3: Links for %s: %s", unhashed_j, y_k[j]["links"])
                 else:
                     y_k[j]["age"] = y_hat[0][j]["age"]
                     y_k[j]["w"] = y_hat[0][j]["w"]
                     y_k[j]["ci"] = y_hat[0][j]["ci"]
                     y_k[j]["links"] = y_hat[0][j]["links"]
+                    col_logger.info("CONDITION 4: Links for %s: %s", unhashed_j, y_k[j]["links"])
 
         return (y_k, historyk)
 
