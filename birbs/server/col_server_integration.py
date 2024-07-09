@@ -134,7 +134,7 @@ class COLServerIntegration:
         # Prediction dictionary
         result = {}
 
-        for key, index in enumerate(query_predictions):
+        for index, key in enumerate(query_predictions):
             result[key] = link_predictions[index]
 
         # Format it as a json response

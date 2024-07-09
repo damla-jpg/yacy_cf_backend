@@ -733,7 +733,7 @@ class COL:
                     y_k[j]["age"] = max(y_hat[0][j]["age"], y[0][j]["age"])
                     y_k[j]["w"] = (1 - w) * y[0][j]["w"] + w * y_hat[0][j]["w"]
                     y_k[j]["ci"] = (1 - w) * y[0][j]["ci"] + w * y_hat[0][j]["ci"]
-                    y_k[j]["links"] = set(y[0][j]["links"] + y_hat[0][j]["links"])
+                    y_k[j]["links"] = list(set(list(y[0][j]["links"]) + list(y_hat[0][j]["links"])))
                 else:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
