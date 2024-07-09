@@ -453,10 +453,10 @@ class COL:
         predictions = np.matmul(xi, np.array(weights).T) - bi - cis
         indexes = np.argsort(predictions)[::-1]
         p = []
-        predicted_links = []
+        predicted_links = {}
         for index in indexes:
             p.append(url_hash[index])
-            predicted_links.append(links[index])
+            predicted_links[url_hash[index]] = links[index]
 
         nonlocal_hashes = []
         nonlocal_links = []
@@ -465,7 +465,7 @@ class COL:
             for each_hash in p:
                 if each_hash not in local_hashes:
                     nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
-                    nonlocal_links.append([bytes.fromhex(link) for link in predicted_links])
+                    nonlocal_links.append([bytes.fromhex(link) for link in predicted_links[each_hash]])
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
                 nonlocal_links = nonlocal_links[0 : self.max_rec]
