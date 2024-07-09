@@ -127,11 +127,19 @@ class COLServerIntegration:
             return
 
         # Fetch the predictions
-        predictions = self.col.p
+        
+        query_predictions = self.col.p[0]
+        link_predictions = self.col.p[1]
+
+        # Prediction dictionary
+        result = {}
+
+        for key, index in enumerate(query_predictions):
+            result[key] = link_predictions[index]
 
         # Format it as a json response
         response = {
-            "predictions": predictions
+            "predictions": result
         }
 
         return response

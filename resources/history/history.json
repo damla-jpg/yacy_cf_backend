@@ -149,6 +149,36 @@
                 }
             ],
             "total_frequency": 1
+        },
+        {
+            "query": "planets",
+            "results": [
+                {
+                    "link": "http://cleverplanets.org/",
+                    "frequency": 1
+                }
+            ],
+            "total_frequency": 1
+        },
+        {
+            "query": "yahoo",
+            "results": [
+                {
+                    "link": "https://sports.yahoo.com/podcasts/",
+                    "frequency": 1
+                }
+            ],
+            "total_frequency": 1
+        },
+        {
+            "query": "hacking tools",
+            "results": [
+                {
+                    "link": "https://www.darknet.org.uk/tag/database-hacking/page/2/",
+                    "frequency": 1
+                }
+            ],
+            "total_frequency": 1
         }
     ]
 }

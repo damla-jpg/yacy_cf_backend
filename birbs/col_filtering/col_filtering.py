@@ -111,6 +111,21 @@ class COL:
             return
 
         return history["history"]
+    
+    def add_links(self, key):
+        """
+        Add links to the search history of the node.
+        """
+
+        history = self.load_history()
+
+        # unhash the key
+        query = bytes.fromhex(key).decode("utf-8")
+
+        for h in history:
+            if h["query"] == query:
+                return [r["link"].encode("utf-8").hex() for r in h["results"]]
+
 
     def generate_hashes(self, qi):
         """
@@ -195,6 +210,7 @@ class COL:
                 "w": np.random.normal(loc=0.0, scale=1.0, size=k),
                 "ci": np.random.normal(loc=0.0, scale=1.0),
                 "age": 0,
+                "links": self.add_links(h),
             }
 
         # return the parameters and clean history
@@ -423,10 +439,12 @@ class COL:
         url_hash = []
         weights = []
         cis = []
+        links = []
         for hash_ in y[0]:
             url_hash.append(hash_)
             weights.append(y[0][hash_]["w"])
             cis.append(y[0][hash_]["ci"])
+            links.append(y[0][hash_]["links"])
 
         predictions = np.matmul(xi, np.array(weights).T) - bi - cis
         indexes = np.argsort(predictions)[::-1]
@@ -435,15 +453,18 @@ class COL:
             p.append(url_hash[index])
 
         nonlocal_hashes = []
+        nonlocal_links = []
 
         with self.lock:
-            for each_hash in p:
+            for i, each_hash in enumerate(p):
                 if each_hash not in local_hashes:
                     nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
+                    nonlocal_links.append(links[i])
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
+                nonlocal_links = nonlocal_links[0 : self.max_rec]
 
-        return nonlocal_hashes
+        return nonlocal_hashes, nonlocal_links
 
     def update_model_with_bias(self, y, xi, ai, bi, k, lr, rp):
         """
