@@ -448,24 +448,24 @@ class COL:
             weights.append(y[0][hash_]["w"])
             cis.append(y[0][hash_]["ci"])
             links.append(y[0][hash_]["links"])
+            
 
         predictions = np.matmul(xi, np.array(weights).T) - bi - cis
         indexes = np.argsort(predictions)[::-1]
         p = []
+        predicted_links = []
         for index in indexes:
             p.append(url_hash[index])
+            predicted_links.append(links[index])
 
         nonlocal_hashes = []
         nonlocal_links = []
 
         with self.lock:
-            for i, each_hash in enumerate(p):
+            for each_hash in p:
                 if each_hash not in local_hashes:
                     nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
-                    unhashed_links = []
-                    for link in links[i]:
-                        unhashed_links.append(bytes.fromhex(link).decode("utf-8"))
-                    nonlocal_links.append(unhashed_links)
+                    nonlocal_links.append([bytes.fromhex(link) for link in predicted_links])
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
                 nonlocal_links = nonlocal_links[0 : self.max_rec]
@@ -739,26 +739,26 @@ class COL:
                     y_k[j]["ci"] = (1 - w) * y[0][j]["ci"] + w * y_hat[0][j]["ci"]
                     y_k[j]["links"] = list(set(list(y[0][j]["links"]) + list(y_hat[0][j]["links"])))
                     # log the links per j
-                    col_logger.info("CONDITION 1: Links for %s: %s", unhashed_j, y_k[j]["links"])
+                    # col_logger.info("CONDITION 1: Links for %s: %s", unhashed_j, y_k[j]["links"])
                 else:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
                     y_k[j]["ci"] = y[0][j]["ci"]
                     y_k[j]["links"] = y[0][j]["links"]
-                    col_logger.info("CONDITION 2: Links for %s: %s", unhashed_j, y_k[j]["links"])
+                    # col_logger.info("CONDITION 2: Links for %s: %s", unhashed_j, y_k[j]["links"])
             else:
                 if j in y[0]:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
                     y_k[j]["ci"] = y[0][j]["ci"]
                     y_k[j]["links"] = y[0][j]["links"]
-                    col_logger.info("CONDITION 3: Links for %s: %s", unhashed_j, y_k[j]["links"])
+                    # col_logger.info("CONDITION 3: Links for %s: %s", unhashed_j, y_k[j]["links"])
                 else:
                     y_k[j]["age"] = y_hat[0][j]["age"]
                     y_k[j]["w"] = y_hat[0][j]["w"]
                     y_k[j]["ci"] = y_hat[0][j]["ci"]
                     y_k[j]["links"] = y_hat[0][j]["links"]
-                    col_logger.info("CONDITION 4: Links for %s: %s", unhashed_j, y_k[j]["links"])
+                    # col_logger.info("CONDITION 4: Links for %s: %s", unhashed_j, y_k[j]["links"])
 
         return (y_k, historyk)
 
