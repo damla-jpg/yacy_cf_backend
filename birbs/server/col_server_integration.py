@@ -128,8 +128,8 @@ class COLServerIntegration:
 
         # Fetch the predictions
         
-        query_predictions = self.col.p[0]
-        link_predictions = self.col.p[1]
+        query_predictions = self.col.p
+        link_predictions = self.col.links
 
         # Prediction dictionary
         result = {}

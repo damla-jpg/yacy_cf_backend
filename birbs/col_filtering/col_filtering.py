@@ -94,6 +94,7 @@ class COL:
             self.lr = 0.001
             self.rp = 1
             self.p = []
+            self.links = []
             self.max_rec = 40
             self.method = METHOD
 
@@ -621,11 +622,12 @@ class COL:
             bi = bi / len(list(ai.keys()))
 
             # Make predictions
-            predictions = self.predict(xi, ai, y, bi)
+            predictions, links = self.predict(xi, ai, y, bi)
 
             # If predictions are made assign them to the class variable
             if predictions:
                 self.p = predictions
+                self.links = links
 
             # Update the class variables
             self.y = y
