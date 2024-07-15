@@ -1,6 +1,7 @@
 """
 This file contains the server implementation for the Birbs project.
 """
+
 # pylint: disable=C0301, W0718, W0603
 
 # Default imports
@@ -8,6 +9,7 @@ import os
 import logging
 import json
 import pickle
+import timeit
 
 # Third-party imports
 import flask as fl
@@ -182,8 +184,10 @@ def get_contact_list():
 
     url = f"http://localhost:{USERPORT}/Messages_p.html"
     response = req.get(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return response.text
     else:
@@ -198,8 +202,10 @@ def retrieve_message_ids():
 
     url = f"http://localhost:{USERPORT}/Messages_p.xml"
     response = req.get(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return response.text
     else:
@@ -215,8 +221,10 @@ def retrieve_message_contents():
     message_id = fl.request.args.get("messageId")
     url = f"http://localhost:{USERPORT}/Messages_p.html?action=view&object={message_id}"
     response = req.get(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return response.text
     else:
@@ -235,13 +243,14 @@ def send_message():
     url = f"http://localhost:{USERPORT}/MessageSend_p.html?hash={hash_}&subject={subject}&message={message}"
     # print('url:', url)
     response = req.post(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return jsonify(response.text)
     else:
         return jsonify(error="Failed to send message")
-
 
 @app.route("/api/create_whitelist", methods=["POST"])
 def create_whitelist():
@@ -277,6 +286,32 @@ def create_whitelist():
 
         with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
             json.dump(peer_dict, f)
+
+        if COL_INTEGRATION is None:
+            server_logger.error("COL_INTEGRATION not initialized, this is happening during whitelist creation.")
+            return jsonify(error="Whitelist created but couldn't send message to the added peer. COL_INTEGRATION not initialized")
+        
+        if COL_INTEGRATION.col is None:
+            server_logger.error("col not initialized, this is happening during whitelist creation.")
+            return jsonify(error="Whitelist created but couldn't send message to the added peer. COL not initialized")
+        
+        try:
+            # Current node info
+            crr_ip = COL_INTEGRATION.col.ip_address
+            # TODO: +100 to avoid port conflict. This is a temporary solution
+            crr_port = COL_INTEGRATION.col.port + 100
+            crr_hash = COL_INTEGRATION.col.node_id
+
+            # Send a message to the added peer
+            message = {
+                "msg": "NODE_JOINED",
+                "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
+            }
+
+            send_socket_message(ip, int(port), message)
+        except Exception as e:
+            server_logger.error("An error occurred while sending the message to the server: %s", e)
+            return jsonify(error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server ")
 
         return jsonify(message="Whitelist created")
 
@@ -354,6 +389,7 @@ def upload():
 #                                           COL Integration                                                #
 ############################################################################################################
 
+
 @app.route("/api/fetch_predictions", methods=["GET"])
 def fetch_predictions():
     """
@@ -365,6 +401,7 @@ def fetch_predictions():
         return jsonify(predictions)
     else:
         return jsonify(error="COL not initialized")
+
 
 @app.route("/api/share_history", methods=["POST"])
 def share_history():
@@ -428,7 +465,10 @@ def receive_model():
 
     # Check if the model is valid
     if not model:
-        server_logger.error("Couldn't receive the model from the request (This request is sent from listener.py). Model: %s", model)
+        server_logger.error(
+            "Couldn't receive the model from the request (This request is sent from listener.py). Model: %s",
+            model,
+        )
         return jsonify(error="Invalid model")
 
     server_logger.info("Model received")
@@ -441,7 +481,9 @@ def receive_model():
     return jsonify(message="Model received")
 
 
-def start_server(yacy_settings: dict, host: str, port: int, col_int: cf.COLServerIntegration):
+def start_server(
+    yacy_settings: dict, host: str, port: int, col_int: cf.COLServerIntegration
+):
     """
     This function starts the server.
     """

@@ -5,7 +5,6 @@ This module contains the server integration for the COL.
 # pylint: disable=W0719
 
 # Default imports
-import pickle
 import logging
 
 # Third party imports
@@ -107,8 +106,21 @@ class COLServerIntegration:
             # ...
             pass
         elif message_type == "NODE_JOINED":
-            # ...
-            pass
+            # Make a api call to /api/update_whitelist in the flask server and pass the data
+
+            hash_peer = data["hash"]
+            ip = data["ip"]
+            port = data["port"]
+
+            # Update the whitelist
+            if not hash_peer or not ip or not port:
+                col_integration_logger.error("Invalid data received for NODE_JOINED: %s", data)
+                return
+
+            with open("resources/whitelist/whitelist.json", "a", encoding="utf-8") as f:
+                f.write(f'{{"hash": "{hash_peer}", "ip": "{ip}", "port": "{port}"}}\n')
+
+            return
         elif message_type == "NODE_LEFT":
             # ...
             pass

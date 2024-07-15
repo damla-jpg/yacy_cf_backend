@@ -9,12 +9,14 @@ import socket
 import threading
 import logging
 import pickle
+import time
 
 # Third party imports
 import requests
 
 # Custom imports
 from birbs.config import ConfigLoader
+from birbs.col_filtering.evalutation import evaluate_receiving as eval_sys
 
 NUM_CONNECTIONS = 5
 com_logger = logging.getLogger("Communication")
@@ -38,7 +40,7 @@ class Listener:
         """
         This function handles the incoming messages from the network.
         """
-
+        start_time = time.time()
         # Initialize the variables
         message: bytes = b""
 
@@ -60,12 +62,22 @@ class Listener:
             # Close the socket
             client_socket.close()
 
+        end_time = time.time()
+        
         message = pickle.loads(message)
 
         # Send the message to the backend
         # Get the flask server IP and port
         ip = self.config_loader.flask_settings["host"]
         port = self.config_loader.flask_settings["port"]
+
+        # Message to
+        message_to = str(message["data"][1] + ":" + message["data"][2])
+        # Message from
+        message_from = str(str(message["data"][4][1]) + ":" + str(message["data"][4][2]))
+
+        # Evaluate the system
+        eval_sys(start_time, len(pickle.dumps(message)), end_time, message_from, message_to)
 
         # Send the message to the server
         try:
@@ -83,6 +95,7 @@ class Listener:
                 "An error occurred while sending the message to the server: %s", e
             )
 
+        
         # Log the message
         com_logger.info("Received message: %s", message)
 

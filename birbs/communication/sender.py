@@ -9,7 +9,6 @@ import pickle
 # Default imports
 import socket
 import logging
-
 sender_logger = logging.getLogger("Sender")
 
 

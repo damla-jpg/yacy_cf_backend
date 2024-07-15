@@ -27,6 +27,7 @@ import numpy as np
 # Custom Libraries
 from birbs.communication import send_message as send_socket_message
 from birbs.config import ConfigLoader
+from birbs.col_filtering.evalutation import evaluate_sending as eval_sys
 
 # Numpy error handling for debugging
 np.seterr(over="raise")
@@ -425,7 +426,10 @@ class COL:
 
         # Send the message to the peer
         try:
+            start_time = time.time()
             _ = send_socket_message(ip, int(port), message)
+            end_time = time.time()
+            eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port))
         except Exception as e:
             col_logger.error("An error occurred while sending message: %s", e)
 
