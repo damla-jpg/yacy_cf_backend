@@ -71,10 +71,13 @@ class Listener:
         ip = self.config_loader.flask_settings["host"]
         port = self.config_loader.flask_settings["port"]
 
-        # Message to
-        message_to = str(message["data"][1] + ":" + message["data"][2])
-        # Message from
-        message_from = str(str(message["data"][4][1]) + ":" + str(message["data"][4][2]))
+        if message["msg"] == "NODE_JOINED":
+            #TODO: Change the to
+            message_to = None
+            message_from = str(message["data"]["ip"] + ":" + str(message["data"]["port"]))
+        else:
+            message_to = str(message["data"][1] + ":" + message["data"][2])
+            message_from = str(str(message["data"][4][1]) + ":" + str(message["data"][4][2]))
 
         # Evaluate the system
         eval_sys(start_time, len(pickle.dumps(message)), end_time, message_from, message_to)
