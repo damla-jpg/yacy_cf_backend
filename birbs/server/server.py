@@ -359,11 +359,13 @@ def delete_peer_from_whitelist():
     if COL_INTEGRATION.col is None:
         server_logger.error("col not initialized, this is happening during whitelist creation.")
         return jsonify(error="Whitelist read but couldn't send message to the added peer. COL not initialized")
-        
+    
+    peer_found = False
     # Delete the peer from the whitelist
     for peer in peer_dict["whitelist"]:
         if peer["hash"] == hash_peer:
-
+            peer_found = True
+            server_logger.info("Peer found to delete: %s", peer)
             try:
                 crr_hash = COL_INTEGRATION.col.node_id
 
@@ -374,7 +376,7 @@ def delete_peer_from_whitelist():
                 }
 
                 # TODO: +100 to avoid port conflict. This is a temporary solution
-                send_socket_message(peer["ip"], peer["port"] + 100, message)
+                send_socket_message(peer["ip"], int(peer["port"]) + 100, message)
             except Exception as e:
                 server_logger.error("An error occurred while sending the message to the server: %s", e)
                 return jsonify(error="Peer found to delete but couldn't send message to the added peer. Error occurred while sending the message to the server ")
@@ -385,6 +387,9 @@ def delete_peer_from_whitelist():
             ) as f:
                 json.dump(peer_dict, f)
             return jsonify(message="Peer deleted")
+
+    if not peer_found:
+        server_logger.error("Peer not found to delete: %s", hash_peer)
 
     return jsonify(error="Peer not found")
 
