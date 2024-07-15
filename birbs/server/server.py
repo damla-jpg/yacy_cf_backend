@@ -345,24 +345,48 @@ def delete_peer_from_whitelist():
     # Check if the hash is valid
     if not hash_peer:
         return jsonify(error="Invalid hash")
-    else:
-        try:
-            with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
-                peer_dict = json.load(f)
-        except json.JSONDecodeError:
-            return jsonify(error="Error decoding JSON")
 
-        # Delete the peer from the whitelist
-        for peer in peer_dict["whitelist"]:
-            if peer["hash"] == hash_peer:
-                peer_dict["whitelist"].remove(peer)
-                with open(
-                    "resources/whitelist/whitelist.json", "w", encoding="utf-8"
-                ) as f:
-                    json.dump(peer_dict, f)
-                return jsonify(message="Peer deleted")
+    try:
+        with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+            peer_dict = json.load(f)
+    except json.JSONDecodeError:
+        return jsonify(error="Error decoding JSON")
+    
+    if COL_INTEGRATION is None:
+            server_logger.error("COL_INTEGRATION not initialized, this is happening during whitelist creation.")
+            return jsonify(error="Whitelist read but couldn't send message to the added peer. COL_INTEGRATION not initialized")
+        
+    if COL_INTEGRATION.col is None:
+        server_logger.error("col not initialized, this is happening during whitelist creation.")
+        return jsonify(error="Whitelist read but couldn't send message to the added peer. COL not initialized")
+        
+    # Delete the peer from the whitelist
+    for peer in peer_dict["whitelist"]:
+        if peer["hash"] == hash_peer:
 
-        return jsonify(error="Peer not found")
+            try:
+                crr_hash = COL_INTEGRATION.col.node_id
+
+                # Send a message to the added peer
+                message = {
+                    "msg": "NODE_LEFT",
+                    "data": {"hash": crr_hash},
+                }
+
+                # TODO: +100 to avoid port conflict. This is a temporary solution
+                send_socket_message(peer["ip"], peer["port"] + 100, message)
+            except Exception as e:
+                server_logger.error("An error occurred while sending the message to the server: %s", e)
+                return jsonify(error="Peer found to delete but couldn't send message to the added peer. Error occurred while sending the message to the server ")
+
+            peer_dict["whitelist"].remove(peer)
+            with open(
+                "resources/whitelist/whitelist.json", "w", encoding="utf-8"
+            ) as f:
+                json.dump(peer_dict, f)
+            return jsonify(message="Peer deleted")
+
+    return jsonify(error="Peer not found")
 
 
 @app.route("/upload", methods=["POST"])

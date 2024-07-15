@@ -108,8 +108,6 @@ class COLServerIntegration:
             # ...
             pass
         elif message_type == "NODE_JOINED":
-            # Make a api call to /api/update_whitelist in the flask server and pass the data
-
             hash_peer = data["hash"]
             ip = data["ip"]
             port = data["port"]
@@ -137,8 +135,28 @@ class COLServerIntegration:
 
             return
         elif message_type == "NODE_LEFT":
-            # ...
-            pass
+            hash_peer = data["hash"]
+
+            if not hash_peer:
+                col_integration_logger.error("Invalid data received for NODE_LEFT: %s", data)
+                return
+            
+            try: 
+                with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                    peer_dict = json.load(f)
+            except FileNotFoundError:
+                pass
+            except json.JSONDecodeError:
+                print(f)
+                print("Error decoding JSON")
+            
+            # Remove the entry from the whitelist
+            peer_dict["whitelist"] = [peer for peer in peer_dict["whitelist"] if peer["hash"] != hash_peer]
+
+            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+                json.dump(peer_dict, f)
+                
+            return
         else:
             # ...
             pass
