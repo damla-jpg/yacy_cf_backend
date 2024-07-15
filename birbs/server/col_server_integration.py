@@ -6,6 +6,8 @@ This module contains the server integration for the COL.
 
 # Default imports
 import logging
+import os
+import json
 
 # Third party imports
 import requests as req
@@ -111,14 +113,27 @@ class COLServerIntegration:
             hash_peer = data["hash"]
             ip = data["ip"]
             port = data["port"]
+            peer_dict = {"whitelist": []}
 
             # Update the whitelist
             if not hash_peer or not ip or not port:
                 col_integration_logger.error("Invalid data received for NODE_JOINED: %s", data)
                 return
 
-            with open("resources/whitelist/whitelist.json", "a", encoding="utf-8") as f:
-                f.write(f'{{"hash": "{hash_peer}", "ip": "{ip}", "port": "{port}"}}\n')
+            try:
+                with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                    peer_dict = json.load(f)
+            except FileNotFoundError:
+                pass
+            except json.JSONDecodeError:
+                print(f)
+                print("Error decoding JSON")
+
+            # Append the new entry to the existing data
+            peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
+
+            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+                json.dump(peer_dict, f)
 
             return
         elif message_type == "NODE_LEFT":
