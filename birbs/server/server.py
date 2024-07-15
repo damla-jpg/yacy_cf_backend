@@ -367,12 +367,14 @@ def delete_peer_from_whitelist():
             peer_found = True
             server_logger.info("Peer found to delete: %s", peer)
             try:
+                crr_ip = COL_INTEGRATION.col.ip_address
+                crr_port = COL_INTEGRATION.col.port
                 crr_hash = COL_INTEGRATION.col.node_id
-
-                # Send a message to the added peer
+                
+                # Send a message to the deleted peer
                 message = {
                     "msg": "NODE_LEFT",
-                    "data": {"hash": crr_hash},
+                    "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
                 }
 
                 # TODO: +100 to avoid port conflict. This is a temporary solution
