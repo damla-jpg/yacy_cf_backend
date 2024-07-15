@@ -298,8 +298,7 @@ def create_whitelist():
         try:
             # Current node info
             crr_ip = COL_INTEGRATION.col.ip_address
-            # TODO: +100 to avoid port conflict. This is a temporary solution
-            crr_port = COL_INTEGRATION.col.port + 100
+            crr_port = COL_INTEGRATION.col.port
             crr_hash = COL_INTEGRATION.col.node_id
 
             # Send a message to the added peer
@@ -308,7 +307,8 @@ def create_whitelist():
                 "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
             }
 
-            send_socket_message(ip, int(port), message)
+            # TODO: +100 to avoid port conflict. This is a temporary solution
+            send_socket_message(ip, int(port) + 100, message)
         except Exception as e:
             server_logger.error("An error occurred while sending the message to the server: %s", e)
             return jsonify(error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server ")
