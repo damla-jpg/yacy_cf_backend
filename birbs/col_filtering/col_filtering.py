@@ -225,6 +225,14 @@ class COL:
         Output: node: { "ip_address": ip_address, "port": port, "hash": id}
         """
 
+        # If the whitelist file does not exist, return None
+        if not os.path.exists("resources/whitelist/whitelist.json"):
+            return None
+        
+        # If the whitelist file is empty, return None
+        if os.stat("resources/whitelist/whitelist.json").st_size == 0:
+            return None
+
         with open(
             "resources/whitelist/whitelist.json", "r", encoding="utf-8"
         ) as handler:
@@ -429,7 +437,7 @@ class COL:
             start_time = time.time()
             _ = send_socket_message(ip, int(port), message)
             end_time = time.time()
-            eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port))
+            # eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port))
         except Exception as e:
             col_logger.error("An error occurred while sending message: %s", e)
 
