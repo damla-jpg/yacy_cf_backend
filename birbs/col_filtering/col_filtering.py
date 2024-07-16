@@ -27,6 +27,7 @@ import numpy as np
 # Custom Libraries
 from birbs.communication import send_message as send_socket_message
 from birbs.config import ConfigLoader
+from birbs.col_filtering.evalutation import evaluate_sending as eval_sys
 
 # Numpy error handling for debugging
 np.seterr(over="raise")
@@ -94,6 +95,7 @@ class COL:
             self.lr = 0.001
             self.rp = 1
             self.p = []
+            self.links = []
             self.max_rec = 40
             self.method = METHOD
 
@@ -111,6 +113,21 @@ class COL:
             return
 
         return history["history"]
+    
+    def add_links(self, key):
+        """
+        Add links to the search history of the node.
+        """
+
+        history = self.load_history()
+
+        # unhash the key
+        query = bytes.fromhex(key).decode("utf-8")
+
+        for h in history:
+            if h["query"] == query:
+                return [r["link"].encode("utf-8").hex() for r in h["results"]]
+
 
     def generate_hashes(self, qi):
         """
@@ -195,6 +212,7 @@ class COL:
                 "w": np.random.normal(loc=0.0, scale=1.0, size=k),
                 "ci": np.random.normal(loc=0.0, scale=1.0),
                 "age": 0,
+                "links": self.add_links(h),
             }
 
         # return the parameters and clean history
@@ -206,6 +224,14 @@ class COL:
         Input: None
         Output: node: { "ip_address": ip_address, "port": port, "hash": id}
         """
+
+        # If the whitelist file does not exist, return None
+        if not os.path.exists("resources/whitelist/whitelist.json"):
+            return None
+        
+        # If the whitelist file is empty, return None
+        if os.stat("resources/whitelist/whitelist.json").st_size == 0:
+            return None
 
         with open(
             "resources/whitelist/whitelist.json", "r", encoding="utf-8"
@@ -377,9 +403,11 @@ class COL:
                     # Call the on_receive_model function
                     self.on_receive_model(recv_model)
             except Exception as e:
+                import traceback
                 col_logger.error(
                     "An error occurred during the model receive loop: %s", e
                 )
+                col_logger.error(traceback.format_exc())
 
     def forward(self, msg, data):
         """
@@ -406,7 +434,10 @@ class COL:
 
         # Send the message to the peer
         try:
+            start_time = time.time()
             _ = send_socket_message(ip, int(port), message)
+            end_time = time.time()
+            # eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port))
         except Exception as e:
             col_logger.error("An error occurred while sending message: %s", e)
 
@@ -423,27 +454,38 @@ class COL:
         url_hash = []
         weights = []
         cis = []
+        links = []
         for hash_ in y[0]:
             url_hash.append(hash_)
             weights.append(y[0][hash_]["w"])
             cis.append(y[0][hash_]["ci"])
+            links.append(y[0][hash_]["links"])
+            
 
         predictions = np.matmul(xi, np.array(weights).T) - bi - cis
         indexes = np.argsort(predictions)[::-1]
         p = []
+        predicted_links = {}
         for index in indexes:
             p.append(url_hash[index])
+            predicted_links[url_hash[index]] = links[index]
 
         nonlocal_hashes = []
+        nonlocal_links = []
 
         with self.lock:
             for each_hash in p:
                 if each_hash not in local_hashes:
                     nonlocal_hashes.append(bytes.fromhex(each_hash).decode("utf-8"))
+                    nonlocal_links.append([bytes.fromhex(link).decode("utf-8") for link in predicted_links[each_hash]])
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
+                nonlocal_links = nonlocal_links[0 : self.max_rec]
+        
+        col_logger.info("Predictions: %s", nonlocal_hashes)
+        col_logger.info("Links: %s", nonlocal_links)
 
-        return nonlocal_hashes
+        return nonlocal_hashes, nonlocal_links
 
     def update_model_with_bias(self, y, xi, ai, bi, k, lr, rp):
         """
@@ -600,11 +642,12 @@ class COL:
             bi = bi / len(list(ai.keys()))
 
             # Make predictions
-            predictions = self.predict(xi, ai, y, bi)
+            predictions, links = self.predict(xi, ai, y, bi)
 
             # If predictions are made assign them to the class variable
             if predictions:
                 self.p = predictions
+                self.links = links
 
             # Update the class variables
             self.y = y
@@ -697,30 +740,40 @@ class COL:
 
         y_k = {}
         for element in u:
-            y_k[element] = {"age": 0, "w": None, "ci": None}
+            y_k[element] = {"age": 0, "w": None, "ci": None, "links": None}
 
         historyk = y[1]
 
         for j in u:
+            unhashed_j = bytes.fromhex(j).decode("utf-8")
             if j in y[0] and j in y_hat[0]:
                 if y_hat[0][j]["age"] != 0:
                     w = y_hat[0][j]["age"] / (y[0][j]["age"] + y_hat[0][j]["age"])
                     y_k[j]["age"] = max(y_hat[0][j]["age"], y[0][j]["age"])
                     y_k[j]["w"] = (1 - w) * y[0][j]["w"] + w * y_hat[0][j]["w"]
                     y_k[j]["ci"] = (1 - w) * y[0][j]["ci"] + w * y_hat[0][j]["ci"]
+                    y_k[j]["links"] = list(set(list(y[0][j]["links"]) + list(y_hat[0][j]["links"])))
+                    # log the links per j
+                    # col_logger.info("CONDITION 1: Links for %s: %s", unhashed_j, y_k[j]["links"])
                 else:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
                     y_k[j]["ci"] = y[0][j]["ci"]
+                    y_k[j]["links"] = y[0][j]["links"]
+                    # col_logger.info("CONDITION 2: Links for %s: %s", unhashed_j, y_k[j]["links"])
             else:
                 if j in y[0]:
                     y_k[j]["age"] = y[0][j]["age"]
                     y_k[j]["w"] = y[0][j]["w"]
                     y_k[j]["ci"] = y[0][j]["ci"]
+                    y_k[j]["links"] = y[0][j]["links"]
+                    # col_logger.info("CONDITION 3: Links for %s: %s", unhashed_j, y_k[j]["links"])
                 else:
                     y_k[j]["age"] = y_hat[0][j]["age"]
                     y_k[j]["w"] = y_hat[0][j]["w"]
                     y_k[j]["ci"] = y_hat[0][j]["ci"]
+                    y_k[j]["links"] = y_hat[0][j]["links"]
+                    # col_logger.info("CONDITION 4: Links for %s: %s", unhashed_j, y_k[j]["links"])
 
         return (y_k, historyk)
 

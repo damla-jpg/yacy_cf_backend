@@ -1,6 +1,7 @@
 """
 This file contains the server implementation for the Birbs project.
 """
+
 # pylint: disable=C0301, W0718, W0603
 
 # Default imports
@@ -8,6 +9,7 @@ import os
 import logging
 import json
 import pickle
+import timeit
 
 # Third-party imports
 import flask as fl
@@ -182,8 +184,10 @@ def get_contact_list():
 
     url = f"http://localhost:{USERPORT}/Messages_p.html"
     response = req.get(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return response.text
     else:
@@ -198,8 +202,10 @@ def retrieve_message_ids():
 
     url = f"http://localhost:{USERPORT}/Messages_p.xml"
     response = req.get(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return response.text
     else:
@@ -215,8 +221,10 @@ def retrieve_message_contents():
     message_id = fl.request.args.get("messageId")
     url = f"http://localhost:{USERPORT}/Messages_p.html?action=view&object={message_id}"
     response = req.get(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return response.text
     else:
@@ -235,13 +243,14 @@ def send_message():
     url = f"http://localhost:{USERPORT}/MessageSend_p.html?hash={hash_}&subject={subject}&message={message}"
     # print('url:', url)
     response = req.post(
-        url, auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD)
-    , timeout=60)
+        url,
+        auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
+        timeout=60,
+    )
     if response.status_code == 200:
         return jsonify(response.text)
     else:
         return jsonify(error="Failed to send message")
-
 
 @app.route("/api/create_whitelist", methods=["POST"])
 def create_whitelist():
@@ -278,6 +287,32 @@ def create_whitelist():
         with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
             json.dump(peer_dict, f)
 
+        if COL_INTEGRATION is None:
+            server_logger.error("COL_INTEGRATION not initialized, this is happening during whitelist creation.")
+            return jsonify(error="Whitelist created but couldn't send message to the added peer. COL_INTEGRATION not initialized")
+        
+        if COL_INTEGRATION.col is None:
+            server_logger.error("col not initialized, this is happening during whitelist creation.")
+            return jsonify(error="Whitelist created but couldn't send message to the added peer. COL not initialized")
+        
+        try:
+            # Current node info
+            crr_ip = COL_INTEGRATION.col.ip_address
+            crr_port = COL_INTEGRATION.col.port
+            crr_hash = COL_INTEGRATION.col.node_id
+
+            # Send a message to the added peer
+            message = {
+                "msg": "NODE_JOINED",
+                "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
+            }
+
+            # TODO: +100 to avoid port conflict. This is a temporary solution
+            send_socket_message(ip, int(port) + 100, message)
+        except Exception as e:
+            server_logger.error("An error occurred while sending the message to the server: %s", e)
+            return jsonify(error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server ")
+
         return jsonify(message="Whitelist created")
 
 
@@ -310,24 +345,55 @@ def delete_peer_from_whitelist():
     # Check if the hash is valid
     if not hash_peer:
         return jsonify(error="Invalid hash")
-    else:
-        try:
-            with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
-                peer_dict = json.load(f)
-        except json.JSONDecodeError:
-            return jsonify(error="Error decoding JSON")
 
-        # Delete the peer from the whitelist
-        for peer in peer_dict["whitelist"]:
-            if peer["hash"] == hash_peer:
-                peer_dict["whitelist"].remove(peer)
-                with open(
-                    "resources/whitelist/whitelist.json", "w", encoding="utf-8"
-                ) as f:
-                    json.dump(peer_dict, f)
-                return jsonify(message="Peer deleted")
+    try:
+        with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+            peer_dict = json.load(f)
+    except json.JSONDecodeError:
+        return jsonify(error="Error decoding JSON")
+    
+    if COL_INTEGRATION is None:
+            server_logger.error("COL_INTEGRATION not initialized, this is happening during whitelist creation.")
+            return jsonify(error="Whitelist read but couldn't send message to the added peer. COL_INTEGRATION not initialized")
+        
+    if COL_INTEGRATION.col is None:
+        server_logger.error("col not initialized, this is happening during whitelist creation.")
+        return jsonify(error="Whitelist read but couldn't send message to the added peer. COL not initialized")
+    
+    peer_found = False
+    # Delete the peer from the whitelist
+    for peer in peer_dict["whitelist"]:
+        if peer["hash"] == hash_peer:
+            peer_found = True
+            server_logger.info("Peer found to delete: %s", peer)
+            try:
+                crr_ip = COL_INTEGRATION.col.ip_address
+                crr_port = COL_INTEGRATION.col.port
+                crr_hash = COL_INTEGRATION.col.node_id
+                
+                # Send a message to the deleted peer
+                message = {
+                    "msg": "NODE_LEFT",
+                    "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
+                }
 
-        return jsonify(error="Peer not found")
+                # TODO: +100 to avoid port conflict. This is a temporary solution
+                send_socket_message(peer["ip"], int(peer["port"]) + 100, message)
+            except Exception as e:
+                server_logger.error("An error occurred while sending the message to the server: %s", e)
+                return jsonify(error="Peer found to delete but couldn't send message to the added peer. Error occurred while sending the message to the server ")
+
+            peer_dict["whitelist"].remove(peer)
+            with open(
+                "resources/whitelist/whitelist.json", "w", encoding="utf-8"
+            ) as f:
+                json.dump(peer_dict, f)
+            return jsonify(message="Peer deleted")
+
+    if not peer_found:
+        server_logger.error("Peer not found to delete: %s", hash_peer)
+
+    return jsonify(error="Peer not found")
 
 
 @app.route("/upload", methods=["POST"])
@@ -354,6 +420,7 @@ def upload():
 #                                           COL Integration                                                #
 ############################################################################################################
 
+
 @app.route("/api/fetch_predictions", methods=["GET"])
 def fetch_predictions():
     """
@@ -365,6 +432,7 @@ def fetch_predictions():
         return jsonify(predictions)
     else:
         return jsonify(error="COL not initialized")
+
 
 @app.route("/api/share_history", methods=["POST"])
 def share_history():
@@ -428,7 +496,10 @@ def receive_model():
 
     # Check if the model is valid
     if not model:
-        server_logger.error("Couldn't receive the model from the request (This request is sent from listener.py). Model: %s", model)
+        server_logger.error(
+            "Couldn't receive the model from the request (This request is sent from listener.py). Model: %s",
+            model,
+        )
         return jsonify(error="Invalid model")
 
     server_logger.info("Model received")
@@ -441,7 +512,9 @@ def receive_model():
     return jsonify(message="Model received")
 
 
-def start_server(yacy_settings: dict, host: str, port: int, col_int: cf.COLServerIntegration):
+def start_server(
+    yacy_settings: dict, host: str, port: int, col_int: cf.COLServerIntegration
+):
     """
     This function starts the server.
     """

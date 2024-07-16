@@ -5,8 +5,9 @@ This module contains the server integration for the COL.
 # pylint: disable=W0719
 
 # Default imports
-import pickle
 import logging
+import os
+import json
 
 # Third party imports
 import requests as req
@@ -107,11 +108,55 @@ class COLServerIntegration:
             # ...
             pass
         elif message_type == "NODE_JOINED":
-            # ...
-            pass
+            hash_peer = data["hash"]
+            ip = data["ip"]
+            port = data["port"]
+            peer_dict = {"whitelist": []}
+
+            # Update the whitelist
+            if not hash_peer or not ip or not port:
+                col_integration_logger.error("Invalid data received for NODE_JOINED: %s", data)
+                return
+
+            try:
+                with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                    peer_dict = json.load(f)
+            except FileNotFoundError:
+                pass
+            except json.JSONDecodeError:
+                print(f)
+                print("Error decoding JSON")
+
+            # Append the new entry to the existing data
+            peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
+
+            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+                json.dump(peer_dict, f)
+
+            return
         elif message_type == "NODE_LEFT":
-            # ...
-            pass
+            hash_peer = data["hash"]
+
+            if not hash_peer:
+                col_integration_logger.error("Invalid data received for NODE_LEFT: %s", data)
+                return
+            
+            try: 
+                with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                    peer_dict = json.load(f)
+            except FileNotFoundError:
+                pass
+            except json.JSONDecodeError:
+                print(f)
+                print("Error decoding JSON")
+            
+            # Remove the entry from the whitelist
+            peer_dict["whitelist"] = [peer for peer in peer_dict["whitelist"] if peer["hash"] != hash_peer]
+
+            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+                json.dump(peer_dict, f)
+                
+            return
         else:
             # ...
             pass
@@ -127,11 +172,19 @@ class COLServerIntegration:
             return
 
         # Fetch the predictions
-        predictions = self.col.p
+        
+        query_predictions = self.col.p
+        link_predictions = self.col.links
+
+        # Prediction dictionary
+        result = {}
+
+        for index, key in enumerate(query_predictions):
+            result[key] = link_predictions[index]
 
         # Format it as a json response
         response = {
-            "predictions": predictions
+            "predictions": result
         }
 
         return response
