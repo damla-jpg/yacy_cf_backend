@@ -1,0 +1,52 @@
+version: '0.2'
+name: yacy-masterplan
+services: 
+  yacy-server:
+    image: yacy/yacy_search_server:latest
+    container_name: yacy-server
+    hostname: yacy-server
+    ports:
+      - "8090:8090"
+      - "8443:8443"
+    expose:
+      - "8090"
+    volumes:
+      - ./yacy_data:/var/yacy
+
+  yacy-cf-backend:
+    image: raiduy/yacy_cf_backend:latest
+    container_name: yacy-cf-backend
+    hostname: yacy-cf-backend
+    ports:
+      - "3001:3001"
+      - "8190:8190"
+    expose:
+      - "3001"
+      - "8190"
+    depends_on:
+      - yacy-server
+    restart: always
+    environment:
+      - FLASK_ENV=development
+      - YACY_USERNAME=test-123
+      - YACY_PASSWORD=selin1234
+      - YACY_PORT=8090
+      - SERVER_FLASK_HOST=localhost
+      - SERVER_FLASK_PORT=3001
+      - SOCKET_HOST=0.0.0.0
+      - SOCKET_PORT=8190
+      - DEBUG_ONLY_LISTEN=false
+
+  yacy-frontend:
+    image: raiduy/yacy_frontend:latest
+    container_name: yacy-frontend
+    ports:
+      - "3000:3000"
+    expose:
+      - "3000"
+    depends_on:
+      - yacy-cf-backend
+    restart: always
+    environment:
+      - REACT_APP_API_PORT=3001
+      - REACT_APP_BACKEND_ADDRESS=localhost

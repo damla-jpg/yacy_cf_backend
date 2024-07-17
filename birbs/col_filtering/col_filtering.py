@@ -11,17 +11,13 @@ The code was modified to fit this project.
 # Default Libraries
 import os
 import random
-import pickle
 import json
 import time
 import threading
-import xml.etree.ElementTree as ET
 import logging
 import queue
 
 # Third Party Libraries
-import requests
-from bs4 import BeautifulSoup
 import numpy as np
 
 # Custom Libraries
@@ -35,11 +31,6 @@ np.seterr(over="raise")
 # Constants
 MODE = "production"
 METHOD = "biases"
-
-JOIN_MESSAGE = "JOIN_PASTRY"
-ADD_MESSAGE = "ADD_MESSAGE"
-FAILED_NODE = "FAILED_NODE"
-SEND_MODEL = "SEND_MODEL"
 
 B = 4
 N = 50
@@ -76,16 +67,7 @@ class COL:
             self.node_state = tuple((self.node_id, self.ip_address, self.port))
             self.r = [[None for j in range(pow(2, B))] for i in range(HASH_SIZE)]
             self.m = [None for x in range(pow(2, B + 1))]
-            self.l_min = [None for x in range(pow(2, B - 1))]
-            self.l_max = [None for x in range(pow(2, B - 1))]
-            self.main_node = {"ip_address": "localhost", "port": 9090}
-            self.overlay_interval = 20
-            self.heartbeat_interval = 15
-            self.pastry_nodes = []
-
             self.search_queries = self.load_history()
-
-            self.ht = {}
             self.delta = 5
             self.y = None  # The base model of the node
             self.received_y = []  # Storage for the received models
@@ -98,7 +80,6 @@ class COL:
             self.links = []
             self.max_rec = 40
             self.method = METHOD
-
             self.queue = queue.Queue()
 
     def load_history(self, path="resources/history/history.json"):
@@ -538,48 +519,6 @@ class COL:
             y[0][each_hash]["ci"] = cisprime[all_ai.index(each_hash)]
 
         return y, xprime, biprime
-
-    def receive_models(self):
-        """
-        Function to retrieve all received models.
-        """
-
-        with self.lock:
-            # Retrieving message ids
-            query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/retrieve_message_ids"
-            document = requests.get(query, timeout=60).text
-
-            xml_root = ET.fromstring(document)
-            message_ids = [
-                {"id": message.get("id")} for message in xml_root.findall(".//message")
-            ]
-
-            all_models = {}
-
-            # Retrieving messages
-            for message in message_ids:
-                query = f"http://localhost:{self.config_loader.flask_settings['port']}/api/get_message_contents?messageId={message['id']}"
-                document = BeautifulSoup(
-                    requests.get(query, timeout=60).text, "html.parser"
-                )
-                pairs = document.find(class_="pairs")
-                if pairs:
-                    message_data = pairs.find_all("dd")
-                    from_ = message_data[0].get_text()
-                    subject = message_data[3].get_text()
-                    message = message_data[4].get_text()
-
-                    # Unpickle the message
-                    # message is a string that is pickled
-                    # get rid of empty spaces and new lines
-                    message = message.replace(" ", "").replace("\n", "")
-                    message = pickle.loads(message, encoding="ASCII")
-
-                    # Add the message to the dictionary
-                    if subject == "SEND_MODEL":
-                        all_models[from_] = message
-
-        return all_models
 
     def on_receive_model(self, model):
         """

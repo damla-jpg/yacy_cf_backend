@@ -6,7 +6,6 @@ This module contains the server integration for the COL.
 
 # Default imports
 import logging
-import os
 import json
 
 # Third party imports
@@ -72,6 +71,13 @@ class COLServerIntegration:
         }
 
         col_integration_logger.info("Fetched the Yacy info: %s", self.yacy_info)
+
+        # Get the ip address of the computer
+        ip = req.get("https://api.ipify.org", timeout=60).text
+
+        if self.yacy_info["ip"] != ip:
+            col_integration_logger.error("The IP address of the computer is different from the Yacy IP address")
+            return
 
         # Initialize the COL
         self.col = COL(

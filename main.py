@@ -8,6 +8,7 @@ import os
 import sys
 import logging
 import time
+import requests as req
 
 # Custom imports
 from birbs.server import start_server
@@ -123,16 +124,53 @@ class Birbs:
         except Exception as e:
             self.logger.error("An error occurred during starting the server: %s", e)
 
+    def peer_check(self):
+        """
+        This function checks if the peer is a senior peer.
+        """
+
+        seedlist_url = f"http://localhost:{self.config_loader.yacy_settings['port']}/yacy/seedlist.json"
+        ip_url = "https://api.ipify.org"
+
+        try:
+            response = req.get(seedlist_url, timeout=60)
+
+            if response.status_code == 200:
+                peers = response.json()
+                try:
+                    ip = req.get(ip_url, timeout=60).text
+                    if ip == peers["peers"][0]["IP"] and peers["peers"][0]["PeerType"] == "senior":
+                        return True
+                except Exception as e:
+                    self.logger.error("An error occurred during fetching the IP: %s", e)
+            else:
+                self.logger.error("An error occurred during fetching the peers: %s", response.status_code)
+        except Exception as e:
+            self.logger.error("An error occurred during fetching the peers: %s", e)
+
+        return False
+
     def start(self):
         """
         This function runs the server and the socket listener.
         """
+        self.clear_logs()
 
-        # Clear the logs
-        choice = input("Do you want to clear the logs? (y/n): ")
+        is_senior = False
+        # Check if the peer is a senior peer
+        for _ in range(60):
+            self.logger.info("Checking if the peer is a senior peer...")
+            if self.peer_check():
+                is_senior = True
+                self.logger.info("The peer is a senior peer.")
+                break
 
-        if choice.lower() == "y":
-            self.clear_logs()
+            self.logger.info("The peer is not a senior peer. Retrying...")
+            time.sleep(1)
+
+        if not is_senior:
+            self.logger.error("The peer is not a senior peer. Exiting the program...")
+            return
 
         # Start the socket listener
         self.start_socket_listener()
