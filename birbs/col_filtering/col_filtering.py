@@ -357,8 +357,7 @@ class COL:
         # Set the thread as a daemon (will close when the main thread closes)
         receive_model_thread.daemon = True
 
-        # only_listen = os.getenv("DEBUG_ONLY_LISTEN", "False")
-        only_listen = False
+        only_listen = bool(os.getenv("DEBUG_ONLY_LISTEN", "False"))
         
         # Start the LRMF thread
         if not only_listen:
