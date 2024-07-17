@@ -16,6 +16,7 @@ import time
 import threading
 import logging
 import queue
+import pickle
 
 # Third Party Libraries
 import numpy as np
@@ -357,8 +358,8 @@ class COL:
         # Set the thread as a daemon (will close when the main thread closes)
         receive_model_thread.daemon = True
 
-        only_listen = bool(os.getenv("DEBUG_ONLY_LISTEN", "False"))
-        
+        # only_listen = bool(os.getenv("DEBUG_ONLY_LISTEN", "False"))
+        only_listen = False
         # Start the LRMF thread
         if not only_listen:
             lrmf_thread.start()
@@ -418,7 +419,7 @@ class COL:
             start_time = time.time()
             _ = send_socket_message(ip, int(port), message)
             end_time = time.time()
-            # eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port))
+            eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port))
         except Exception as e:
             col_logger.error("An error occurred while sending message: %s", e)
 

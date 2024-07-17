@@ -396,26 +396,6 @@ def delete_peer_from_whitelist():
     return jsonify(error="Peer not found")
 
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    """
-    This function uploads a file to the server.
-    """
-
-    if "files" not in fl.request.files:
-        return jsonify(error="No files were uploaded")
-    file = fl.request.files["files"]
-    if file.filename == "":
-        return jsonify(error="No files were uploaded")
-    if file:
-        if not os.path.exists("resources/history"):
-            os.makedirs("history")
-        file.save(os.path.join("resources/history", file.filename))
-        return jsonify(message="File uploaded")
-    else:
-        return jsonify(error="Error uploading file")
-
-
 ############################################################################################################
 #                                           COL Integration                                                #
 ############################################################################################################
@@ -470,15 +450,6 @@ def share_history():
         server_logger.error("/api/share_history: An error occurred: %s", e)
 
         return jsonify(error="Failed to send message")
-
-
-@app.route("/test", methods=["GET"])
-def test_col():
-    """
-    This function tests the COL.
-    """
-
-    return jsonify(message="COL started")
 
 
 @app.route("/api/receive_model", methods=["POST"])
