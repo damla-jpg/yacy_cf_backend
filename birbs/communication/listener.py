@@ -10,12 +10,13 @@ import threading
 import logging
 import pickle
 import time
+import os
 
 # Third party imports
 import requests
 
 # Custom imports
-from birbs.config import ConfigLoader
+# from birbs.config import ConfigLoader
 from birbs.col_filtering.evalutation import evaluate_receiving as eval_sys
 
 NUM_CONNECTIONS = 5
@@ -34,7 +35,7 @@ class Listener:
         self.stop_signal = threading.Event()
 
         # Initialize the configuration
-        self.config_loader = ConfigLoader()
+        # self.config_loader = ConfigLoader()
 
     def handle_client(self, client_socket: socket.socket):
         """
@@ -68,8 +69,8 @@ class Listener:
 
         # Send the message to the backend
         # Get the flask server IP and port
-        ip = self.config_loader.flask_settings["host"]
-        port = self.config_loader.flask_settings["port"]
+        ip = os.getenv("FLASK_SERVER_HOST", "localhost")
+        port = os.getenv("FLASK_SERVER_PORT", "3001")
 
         if message["msg"] == "SEND_MODEL":
             message_to = str(str(message["data"][1]) + ":" + str(message["data"][2]))

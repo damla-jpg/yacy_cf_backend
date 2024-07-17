@@ -7,13 +7,14 @@ This module contains the server integration for the COL.
 # Default imports
 import logging
 import json
+import os
 
 # Third party imports
 import requests as req
 
 # Custom imports
 from birbs.col_filtering import COL
-import birbs.config.config_loader as config_loader
+# import birbs.config.config_loader as config_loader
 
 col_integration_logger = logging.getLogger("COLServerIntegration")
 
@@ -28,9 +29,11 @@ class COLServerIntegration:
         self.col : COL = None
         self.peers : dict = {}
         self.yacy_info : dict= {}
+        self.yacy_service = os.getenv("YACY_SERVICE", "localhost")
+        self.yacy_port = os.getenv("YACY_PORT", "8090")
 
         # Initialize the configuration
-        self.config_loader = config_loader.ConfigLoader()
+        # self.config_loader = config_loader.ConfigLoader()
 
     def fetch_peers(self):
         """
@@ -38,11 +41,11 @@ class COLServerIntegration:
         """
 
         # Fetch the yacy info from the config
-        yacy_info = self.config_loader.yacy_settings
+        # yacy_info = self.config_loader.yacy_settings
 
         # Fetch the peers
         try:
-            url = f"http://localhost:{yacy_info['port']}/yacy/seedlist.json"
+            url = f"http://{self.yacy_service}:{self.yacy_port}/yacy/seedlist.json"
             response = req.get(url, timeout=60)
 
             if response.status_code == 200:
@@ -71,13 +74,6 @@ class COLServerIntegration:
         }
 
         col_integration_logger.info("Fetched the Yacy info: %s", self.yacy_info)
-
-        # Get the ip address of the computer
-        ip = req.get("https://api.ipify.org", timeout=60).text
-
-        if self.yacy_info["ip"] != ip:
-            col_integration_logger.error("The IP address of the computer is different from the Yacy IP address")
-            return
 
         # Initialize the COL
         self.col = COL(

@@ -13,7 +13,6 @@ import requests as req
 # Custom imports
 from birbs.server import start_server
 from birbs.communication import Listener
-from birbs.config import ConfigLoader
 import birbs.server.col_server_integration as col_server_integration
 
 
@@ -35,9 +34,6 @@ class Birbs:
 
         # Initialize the logger
         self.logger_rpath = self.init_logger()
-
-        # Initialize the configuration
-        self.config_loader = ConfigLoader()
 
     def init_logger(self):
         """
@@ -74,8 +70,8 @@ class Birbs:
 
                 # Start the socket listener
                 self.listener = Listener(
-                    self.config_loader.socket_settings["host"],
-                    self.config_loader.socket_settings["port"],
+                    os.getenv("SOCKET_HOST", "0.0.0.0"),
+                    int(os.getenv("SOCKET_PORT", "8190")),
                 )
 
                 self.listener.start()
@@ -114,9 +110,10 @@ class Birbs:
 
             # Start the server, this is a blocking call (technically main thread loop)
             start_server(
-                self.config_loader.yacy_settings,
-                self.config_loader.flask_settings["host"],
-                self.config_loader.flask_settings["port"],
+                # self.config_loader.flask_settings["host"],
+                # self.config_loader.flask_settings["port"],
+                os.getenv("SERVER_FLASK_HOST", "localhost"),
+                os.getenv("SERVER_FLASK_PORT", "3001"),
                 self.col_integration,
             )
 
@@ -129,7 +126,10 @@ class Birbs:
         This function checks if the peer is a senior peer.
         """
 
-        seedlist_url = f"http://localhost:{self.config_loader.yacy_settings['port']}/yacy/seedlist.json"
+        YACY_SERVICE = os.getenv("YACY_SERVICE", "localhost")
+        YACY_PORT = os.getenv("YACY_PORT", "8090")
+
+        seedlist_url = f"http://{YACY_SERVICE}:{YACY_PORT}/yacy/seedlist.json"
         ip_url = "https://api.ipify.org"
 
         try:

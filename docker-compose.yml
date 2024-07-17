@@ -14,7 +14,7 @@ services:
       - ./yacy_data:/var/yacy
 
   yacy-cf-backend:
-    image: raiduy/yacy_cf_backend:latest
+    image: dul800/yacy_cf_backend:latest
     container_name: yacy-cf-backend
     hostname: yacy-cf-backend
     ports:
@@ -28,25 +28,26 @@ services:
     restart: always
     environment:
       - FLASK_ENV=development
-      - YACY_USERNAME=test-123
-      - YACY_PASSWORD=selin1234
+      - YACY_USERNAME=admin
+      - YACY_PASSWORD=yacy
       - YACY_PORT=8090
-      - SERVER_FLASK_HOST=localhost
+      - YACY_SERVICE=yacy-server
+      - SERVER_FLASK_HOST=0.0.0.0
       - SERVER_FLASK_PORT=3001
       - SOCKET_HOST=0.0.0.0
       - SOCKET_PORT=8190
-      - DEBUG_ONLY_LISTEN=false
+      - DEBUG_ONLY_LISTEN=False
 
-  yacy-frontend:
-    image: raiduy/yacy_frontend:latest
-    container_name: yacy-frontend
-    ports:
-      - "3000:3000"
-    expose:
-      - "3000"
-    depends_on:
-      - yacy-cf-backend
-    restart: always
-    environment:
-      - REACT_APP_API_PORT=3001
-      - REACT_APP_BACKEND_ADDRESS=localhost
+  # yacy-frontend:
+  #   image: raiduy/yacy_frontend:latest
+  #   container_name: yacy-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   expose:
+  #     - "3000"
+  #   depends_on:
+  #     - yacy-cf-backend
+  #   restart: always
+  #   environment:
+  #     - REACT_APP_API_PORT=3001
+  #     - REACT_APP_BACKEND_ADDRESS=localhost

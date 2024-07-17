@@ -22,7 +22,7 @@ import numpy as np
 
 # Custom Libraries
 from birbs.communication import send_message as send_socket_message
-from birbs.config import ConfigLoader
+# from birbs.config import ConfigLoader
 from birbs.col_filtering.evalutation import evaluate_sending as eval_sys
 
 # Numpy error handling for debugging
@@ -48,7 +48,7 @@ class COL:
     def __init__(self, ip_address, port, hash_):
 
         # Initialize the configuration
-        self.config_loader = ConfigLoader()
+        # self.config_loader = ConfigLoader()
 
         # Initialize the variables
         self.initialize_variables(ip_address, port, hash_)
@@ -357,7 +357,8 @@ class COL:
         # Set the thread as a daemon (will close when the main thread closes)
         receive_model_thread.daemon = True
 
-        only_listen = self.config_loader.debug_settings["only_listen"]
+        # only_listen = os.getenv("DEBUG_ONLY_LISTEN", "False")
+        only_listen = False
         
         # Start the LRMF thread
         if not only_listen:

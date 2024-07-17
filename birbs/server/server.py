@@ -32,7 +32,7 @@ MY_DIGEST_USERNAME = None
 MY_DIGEST_PASSWORD = None
 USERPORT = None
 COL_INTEGRATION = None
-
+YACY_SERVICE = None
 server_logger = logging.getLogger("Server")
 
 ############################################################################################################
@@ -54,7 +54,7 @@ def get_peers():
     This function returns the list of peers in the network.
     """
 
-    url = f"http://localhost:{USERPORT}/yacy/seedlist.json"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/yacy/seedlist.json"
     response = req.get(url, timeout=60)
     if response.status_code == 200:
         return jsonify(response.json())
@@ -68,7 +68,7 @@ def get_profile():
     This function returns the profile of the user.
     """
 
-    url = f"http://localhost:{USERPORT}/Network.xml"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/Network.xml"
     response = req.get(url, timeout=60)
     if response.status_code == 200:
         return response.text
@@ -167,7 +167,7 @@ def search():
 
     query = fl.request.args.get("query")
     start_record = fl.request.args.get("startRecord")
-    url = f"http://localhost:{USERPORT}/yacysearch.json?query={query}&resource=global&urlmaskfilter=.*&prefermaskfilter=&nav=all&startRecord={start_record}"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/yacysearch.json?query={query}&resource=global&urlmaskfilter=.*&prefermaskfilter=&nav=all&startRecord={start_record}"
     response = req.get(url, timeout=60)
 
     if response.status_code == 200:
@@ -182,7 +182,7 @@ def get_contact_list():
     This function returns the contact list of the user.
     """
 
-    url = f"http://localhost:{USERPORT}/Messages_p.html"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/Messages_p.html"
     response = req.get(
         url,
         auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
@@ -200,7 +200,7 @@ def retrieve_message_ids():
     This function retrieves the message ids.
     """
 
-    url = f"http://localhost:{USERPORT}/Messages_p.xml"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/Messages_p.xml"
     response = req.get(
         url,
         auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
@@ -219,7 +219,7 @@ def retrieve_message_contents():
     """
 
     message_id = fl.request.args.get("messageId")
-    url = f"http://localhost:{USERPORT}/Messages_p.html?action=view&object={message_id}"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/Messages_p.html?action=view&object={message_id}"
     response = req.get(
         url,
         auth=req.auth.HTTPDigestAuth(MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD),
@@ -240,7 +240,7 @@ def send_message():
     hash_ = fl.request.args.get("hash")
     subject = fl.request.args.get("subject")
     message = fl.request.args.get("message")
-    url = f"http://localhost:{USERPORT}/MessageSend_p.html?hash={hash_}&subject={subject}&message={message}"
+    url = f"http://{YACY_SERVICE}:{USERPORT}/MessageSend_p.html?hash={hash_}&subject={subject}&message={message}"
     # print('url:', url)
     response = req.post(
         url,
@@ -513,22 +513,23 @@ def receive_model():
 
 
 def start_server(
-    yacy_settings: dict, host: str, port: int, col_int: cf.COLServerIntegration
+    host: str, port: int, col_int: cf.COLServerIntegration
 ):
     """
     This function starts the server.
     """
 
     # Check if the settings are valid
-    if not yacy_settings or not host or not port:
+    if not host or not port:
         server_logger.error("Invalid settings.")
         return
 
     # Set the global variables
-    global MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD, USERPORT, COL_INTEGRATION
-    MY_DIGEST_USERNAME = yacy_settings["username"]
-    MY_DIGEST_PASSWORD = yacy_settings["password"]
-    USERPORT = yacy_settings["port"]
+    global MY_DIGEST_USERNAME, MY_DIGEST_PASSWORD, USERPORT, COL_INTEGRATION, YACY_SERVICE
+    MY_DIGEST_USERNAME = os.getenv("YACY_USERNAME", "admin")
+    MY_DIGEST_PASSWORD = os.getenv("YACY_PASSWORD", "admin")
+    USERPORT = os.getenv("YACY_PORT", "8090")
+    YACY_SERVICE = os.getenv("YACY_SERVICE", "localhost")
     COL_INTEGRATION = col_int
 
     try:
