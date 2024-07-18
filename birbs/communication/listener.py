@@ -64,7 +64,7 @@ class Listener:
             client_socket.close()
 
         end_time = time.time()
-        
+
         message = pickle.loads(message)
 
         # Send the message to the backend
@@ -75,11 +75,13 @@ class Listener:
         if message["msg"] == "SEND_MODEL":
             message_to = str(str(message["data"][1]) + ":" + str(message["data"][2]))
             message_from = str(str(message["data"][4][1]) + ":" + str(message["data"][4][2]))
+        elif message["msg"] == "TEST":
+            com_logger.info("RECEIVED TEST MESSAGE: %s", message)
+            return
         else:
-            #TODO: Change the to
             message_to = None
             message_from = str(str(message["data"]["ip"]) + ":" + str(message["data"]["port"]))
-            
+
         # Evaluate the system
         eval_sys(start_time, len(pickle.dumps(message)), end_time, message_from, message_to)
 
@@ -99,9 +101,9 @@ class Listener:
                 "An error occurred while sending the message to the server: %s", e
             )
 
-        
+
         # Log the message
-        com_logger.info("Received message: %s", message)
+        # com_logger.info("Received message: %s", message)
 
         com_logger.info("Client handled.")
 

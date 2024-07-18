@@ -22,7 +22,7 @@ def send_message(ip: str, port: int, message: str | dict):
     response = None
 
     # Log the message
-    sender_logger.info("Trying to send message to %s:%s with message: %s", ip, port, message)
+    sender_logger.info("Trying to send message to %s:%s", ip, port)
 
     # Send the message
     try:

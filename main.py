@@ -8,6 +8,9 @@ import os
 import sys
 import logging
 import time
+import json
+
+# Third party imports
 import requests as req
 
 # Custom imports
@@ -126,10 +129,10 @@ class Birbs:
         This function checks if the peer is a senior peer.
         """
 
-        YACY_SERVICE = os.getenv("YACY_SERVICE", "localhost")
-        YACY_PORT = os.getenv("YACY_PORT", "8090")
+        yacy_service = os.getenv("YACY_SERVICE", "localhost")
+        yacy_port = os.getenv("YACY_PORT", "8090")
 
-        seedlist_url = f"http://{YACY_SERVICE}:{YACY_PORT}/yacy/seedlist.json"
+        seedlist_url = f"http://{yacy_service}:{yacy_port}/yacy/seedlist.json"
         ip_url = "https://api.ipify.org"
 
         try:
@@ -141,14 +144,27 @@ class Birbs:
                     ip = req.get(ip_url, timeout=60).text
                     if ip == peers["peers"][0]["IP"] and peers["peers"][0]["PeerType"] == "senior":
                         return True
-                except Exception as e:
-                    self.logger.error("An error occurred during fetching the IP: %s", e)
+                except Exception as _:
+                    self.logger.error("An error occurred during fetching the IP")
             else:
                 self.logger.error("An error occurred during fetching the peers: %s", response.status_code)
-        except Exception as e:
-            self.logger.error("An error occurred during fetching the peers: %s", e)
+        except Exception as _:
+            self.logger.error("An error occurred during peer check.")
 
         return False
+
+    def get_whitelist(self):
+        '''
+        This function returns the whitelist.
+        '''
+
+        try:
+            with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                peer_dict = json.load(f)
+                return peer_dict["whitelist"]
+        except Exception as e:
+            self.logger.error("An error occurred during reading the whitelist: %s", e)
+            return []
 
     def start(self):
         """
@@ -171,6 +187,11 @@ class Birbs:
         if not is_senior:
             self.logger.error("The peer is not a senior peer. Exiting the program...")
             return
+        
+        # Get the whitelist
+        whitelist = self.get_whitelist()
+
+        self.logger.info("Whitelist: %s", whitelist)
 
         # Start the socket listener
         self.start_socket_listener()

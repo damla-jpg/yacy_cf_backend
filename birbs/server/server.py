@@ -252,6 +252,7 @@ def send_message():
     else:
         return jsonify(error="Failed to send message")
 
+
 @app.route("/api/create_whitelist", methods=["POST"])
 def create_whitelist():
     """
@@ -276,7 +277,9 @@ def create_whitelist():
             with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
                 peer_dict = json.load(f)
         except FileNotFoundError:
-            pass
+            # Create a new file if it doesn't exist
+            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+                json.dump(peer_dict, f)
         except json.JSONDecodeError:
             print(f)
             print("Error decoding JSON")
@@ -288,13 +291,21 @@ def create_whitelist():
             json.dump(peer_dict, f)
 
         if COL_INTEGRATION is None:
-            server_logger.error("COL_INTEGRATION not initialized, this is happening during whitelist creation.")
-            return jsonify(error="Whitelist created but couldn't send message to the added peer. COL_INTEGRATION not initialized")
-        
+            server_logger.error(
+                "COL_INTEGRATION not initialized, this is happening during whitelist creation."
+            )
+            return jsonify(
+                error="Whitelist created but couldn't send message to the added peer. COL_INTEGRATION not initialized"
+            )
+
         if COL_INTEGRATION.col is None:
-            server_logger.error("col not initialized, this is happening during whitelist creation.")
-            return jsonify(error="Whitelist created but couldn't send message to the added peer. COL not initialized")
-        
+            server_logger.error(
+                "col not initialized, this is happening during whitelist creation."
+            )
+            return jsonify(
+                error="Whitelist created but couldn't send message to the added peer. COL not initialized"
+            )
+
         try:
             # Current node info
             crr_ip = COL_INTEGRATION.col.ip_address
@@ -310,8 +321,12 @@ def create_whitelist():
             # TODO: +100 to avoid port conflict. This is a temporary solution
             send_socket_message(ip, int(port) + 100, message)
         except Exception as e:
-            server_logger.error("An error occurred while sending the message to the server: %s", e)
-            return jsonify(error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server ")
+            server_logger.error(
+                "An error occurred while sending the message to the server: %s", e
+            )
+            return jsonify(
+                error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server "
+            )
 
         return jsonify(message="Whitelist created")
 
@@ -351,15 +366,23 @@ def delete_peer_from_whitelist():
             peer_dict = json.load(f)
     except json.JSONDecodeError:
         return jsonify(error="Error decoding JSON")
-    
+
     if COL_INTEGRATION is None:
-            server_logger.error("COL_INTEGRATION not initialized, this is happening during whitelist creation.")
-            return jsonify(error="Whitelist read but couldn't send message to the added peer. COL_INTEGRATION not initialized")
-        
+        server_logger.error(
+            "COL_INTEGRATION not initialized, this is happening during whitelist creation."
+        )
+        return jsonify(
+            error="Whitelist read but couldn't send message to the added peer. COL_INTEGRATION not initialized"
+        )
+
     if COL_INTEGRATION.col is None:
-        server_logger.error("col not initialized, this is happening during whitelist creation.")
-        return jsonify(error="Whitelist read but couldn't send message to the added peer. COL not initialized")
-    
+        server_logger.error(
+            "col not initialized, this is happening during whitelist creation."
+        )
+        return jsonify(
+            error="Whitelist read but couldn't send message to the added peer. COL not initialized"
+        )
+
     peer_found = False
     # Delete the peer from the whitelist
     for peer in peer_dict["whitelist"]:
@@ -370,7 +393,7 @@ def delete_peer_from_whitelist():
                 crr_ip = COL_INTEGRATION.col.ip_address
                 crr_port = COL_INTEGRATION.col.port
                 crr_hash = COL_INTEGRATION.col.node_id
-                
+
                 # Send a message to the deleted peer
                 message = {
                     "msg": "NODE_LEFT",
@@ -380,13 +403,15 @@ def delete_peer_from_whitelist():
                 # TODO: +100 to avoid port conflict. This is a temporary solution
                 send_socket_message(peer["ip"], int(peer["port"]) + 100, message)
             except Exception as e:
-                server_logger.error("An error occurred while sending the message to the server: %s", e)
-                return jsonify(error="Peer found to delete but couldn't send message to the added peer. Error occurred while sending the message to the server ")
+                server_logger.error(
+                    "An error occurred while sending the message to the server: %s", e
+                )
+                return jsonify(
+                    error="Peer found to delete but couldn't send message to the added peer. Error occurred while sending the message to the server "
+                )
 
             peer_dict["whitelist"].remove(peer)
-            with open(
-                "resources/whitelist/whitelist.json", "w", encoding="utf-8"
-            ) as f:
+            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
                 json.dump(peer_dict, f)
             return jsonify(message="Peer deleted")
 
@@ -414,33 +439,24 @@ def fetch_predictions():
         return jsonify(error="COL not initialized")
 
 
-@app.route("/api/share_history", methods=["POST"])
-def share_history():
+@app.route("/api/test_backend_to_socket", methods=["POST"])
+def test_backend_to_socket():
     """
-    This function shares the history of the user.
+    This function is to test the backend communication with the socket listener.
     """
-    server_logger.info("/api/share_history: sharing history...")
 
-    # Get the ip and port from the headers
-    ip = fl.request.headers.get("ip")
-    port = fl.request.headers.get("port")
-
-    # Check if the ip and port are valid
-    if not ip or not port:
-        server_logger.error("/api/share_history: Invalid IP or port.")
-        return jsonify(error="Invalid IP or port")
+    server_logger.info("Testing backend to socket communication...")
 
     # Get the message from the parameters
     message = fl.request.args.get("message")
 
-    server_logger.info(
-        "/api/share_history: Sending message to %s:%s with message: %s",
-        ip,
-        port,
-        message,
-    )
-
     # Send the message to socket listener
+    server_logger.info("Sending message to socket listener...")
+
+    # Get socket info
+    ip = os.getenv("SOCKET_LISTENER_HOST", "0.0.0.0")
+    port = os.getenv("SOCKET_LISTENER_PORT", "3002")
+
     try:
         send_socket_message(ip, int(port), message)
         server_logger.info("/api/share_history: Message sent.")
@@ -483,9 +499,7 @@ def receive_model():
     return jsonify(message="Model received")
 
 
-def start_server(
-    host: str, port: int, col_int: cf.COLServerIntegration
-):
+def start_server(host: str, port: int, col_int: cf.COLServerIntegration):
     """
     This function starts the server.
     """

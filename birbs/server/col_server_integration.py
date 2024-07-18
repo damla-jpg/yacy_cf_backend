@@ -14,6 +14,7 @@ import requests as req
 
 # Custom imports
 from birbs.col_filtering import COL
+
 # import birbs.config.config_loader as config_loader
 
 col_integration_logger = logging.getLogger("COLServerIntegration")
@@ -26,9 +27,9 @@ class COLServerIntegration:
 
     def __init__(self):
         # Initialize the variables
-        self.col : COL = None
-        self.peers : dict = {}
-        self.yacy_info : dict= {}
+        self.col: COL = None
+        self.peers: dict = {}
+        self.yacy_info: dict = {}
         self.yacy_service = os.getenv("YACY_SERVICE", "localhost")
         self.yacy_port = os.getenv("YACY_PORT", "8090")
 
@@ -50,8 +51,10 @@ class COLServerIntegration:
 
             if response.status_code == 200:
                 return response.json()
-            
-            raise Exception(f"Failed to fetch peers, status code: {response.status_code}")
+
+            raise Exception(
+                f"Failed to fetch peers, status code: {response.status_code}"
+            )
         except Exception as e:
             raise Exception(f"Failed to fetch peers: {e}") from e
 
@@ -85,6 +88,76 @@ class COLServerIntegration:
 
         col_integration_logger.info("COL server integration started")
 
+    def add_to_whitelist(self, data):
+        """
+        This function updates the whitelist with the new peer.
+        """
+
+        hash_peer = data["hash"]
+        ip = data["ip"]
+        port = data["port"]
+        peer_dict = {"whitelist": []}
+
+        # Update the whitelist
+        if not hash_peer or not ip or not port:
+            col_integration_logger.error(
+                "Invalid data received for NODE_JOINED: %s", data
+            )
+            return
+
+        try:
+            with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                peer_dict = json.load(f)
+        except FileNotFoundError:
+            pass
+        except json.JSONDecodeError:
+            print(f)
+            print("Error decoding JSON")
+
+        # Append the new entry to the existing data
+        peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
+
+        col_integration_logger.info("Updated whitelist with added peer: %s", peer_dict)
+
+        with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+            json.dump(peer_dict, f)
+
+        return
+
+    def remove_from_whitelist(self, data):
+        """
+        This function removes the peer from the whitelist.
+        """
+
+        hash_peer = data["hash"]
+
+        if not hash_peer:
+            col_integration_logger.error(
+                "Invalid data received for NODE_LEFT: %s", data
+            )
+            return
+
+        try:
+            with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+                peer_dict = json.load(f)
+        except FileNotFoundError:
+            pass
+        except json.JSONDecodeError:
+            print(f)
+            print("Error decoding JSON")
+
+        # Remove the entry from the whitelist
+        peer_dict["whitelist"] = [
+            peer for peer in peer_dict["whitelist"] if peer["hash"] != hash_peer
+        ]
+
+        col_integration_logger.info("Updated whitelist with removed peer: %s", peer_dict)
+
+        with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+            json.dump(peer_dict, f)
+
+        return
+
     def handle_received_message(self, message):
         """
         This function handles the received message.
@@ -110,59 +183,15 @@ class COLServerIntegration:
             # ...
             pass
         elif message_type == "NODE_JOINED":
-            hash_peer = data["hash"]
-            ip = data["ip"]
-            port = data["port"]
-            peer_dict = {"whitelist": []}
-
             # Update the whitelist
-            if not hash_peer or not ip or not port:
-                col_integration_logger.error("Invalid data received for NODE_JOINED: %s", data)
-                return
-
-            try:
-                with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
-                    peer_dict = json.load(f)
-            except FileNotFoundError:
-                pass
-            except json.JSONDecodeError:
-                print(f)
-                print("Error decoding JSON")
-
-            # Append the new entry to the existing data
-            peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
-
-            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
-                json.dump(peer_dict, f)
-
-            return
+            self.add_to_whitelist(data)
         elif message_type == "NODE_LEFT":
-            hash_peer = data["hash"]
-
-            if not hash_peer:
-                col_integration_logger.error("Invalid data received for NODE_LEFT: %s", data)
-                return
-            
-            try: 
-                with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
-                    peer_dict = json.load(f)
-            except FileNotFoundError:
-                pass
-            except json.JSONDecodeError:
-                print(f)
-                print("Error decoding JSON")
-            
-            # Remove the entry from the whitelist
-            peer_dict["whitelist"] = [peer for peer in peer_dict["whitelist"] if peer["hash"] != hash_peer]
-
-            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
-                json.dump(peer_dict, f)
-                
-            return
+            # Remove the peer from the whitelist
+            self.remove_from_whitelist(data)
         else:
             # ...
             pass
-    
+
     def fetch_predictions(self):
         """
         This function fetches the predictions from the COL.
@@ -174,7 +203,7 @@ class COLServerIntegration:
             return
 
         # Fetch the predictions
-        
+
         query_predictions = self.col.p
         link_predictions = self.col.links
 
@@ -185,8 +214,6 @@ class COLServerIntegration:
             result[key] = link_predictions[index]
 
         # Format it as a json response
-        response = {
-            "predictions": result
-        }
+        response = {"predictions": result}
 
         return response
