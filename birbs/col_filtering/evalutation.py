@@ -23,7 +23,7 @@ def get_number_of_peers_in_list():
     with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as file:
         whitelist = json.load(file)
     
-    return len(whitelist)
+    return len(whitelist["whitelist"])
 
 def evaluate_sending(start_time: float, message_size: int, end_time: float, delta: float, from_: str, to_: str):
     """

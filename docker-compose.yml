@@ -37,6 +37,8 @@ services:
       - SOCKET_HOST=0.0.0.0
       - SOCKET_PORT=8190
       - DEBUG_ONLY_LISTEN=False
+    volumes:
+      - ./evaluation_results:/yacy_cf_backend/resources/data
 
   yacy-frontend:
     image: dul800/yacy_cf_frontend:0.1
@@ -51,3 +53,4 @@ services:
     environment:
       - REACT_APP_API_PORT=3001
       - REACT_APP_BACKEND_ADDRESS=localhost
+      - PORT=3000
