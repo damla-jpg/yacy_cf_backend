@@ -10,11 +10,9 @@ services:
       - "8443:8443"
     expose:
       - "8090"
-    volumes:
-      - ./yacy_data:/var/yacy
 
   yacy-cf-backend:
-    image: dul800/yacy_cf_backend:latest
+    image: dul800/yacy_cf_backend:1.0
     container_name: yacy-cf-backend
     hostname: yacy-cf-backend
     ports:
@@ -39,9 +37,11 @@ services:
       - DEBUG_ONLY_LISTEN=False
     volumes:
       - ./evaluation_results:/yacy_cf_backend/resources/data
+      - ./histories:/yacy_cf_backend/resources/history
+      - ./whitelist:/yacy_cf_backend/resources/whitelist
 
   yacy-frontend:
-    image: dul800/yacy_cf_frontend:0.1
+    image: dul800/yacy_cf_frontend:latest
     container_name: yacy-frontend
     ports:
       - "3000:3000"

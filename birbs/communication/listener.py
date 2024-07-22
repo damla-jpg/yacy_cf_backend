@@ -69,8 +69,8 @@ class Listener:
 
         # Send the message to the backend
         # Get the flask server IP and port
-        ip = os.getenv("FLASK_SERVER_HOST", "localhost")
-        port = os.getenv("FLASK_SERVER_PORT", "3001")
+        ip = os.getenv("SERVER_FLASK_HOST", "localhost")
+        port = os.getenv("SERVER_FLASK_PORT", "3001")
 
         if message["msg"] == "SEND_MODEL":
             message_to = str(str(message["data"][1]) + ":" + str(message["data"][2]))
@@ -79,11 +79,14 @@ class Listener:
             com_logger.info("RECEIVED TEST MESSAGE: %s", message)
             return
         else:
-            message_to = None
+            # get public ip
+            public_ip = requests.get("https://api.ipify.org", timeout=60).text
+            yacy_port = os.getenv("YACY_PORT", "8090")
+            message_to = f'{public_ip}:{yacy_port}'
             message_from = str(str(message["data"]["ip"]) + ":" + str(message["data"]["port"]))
 
         # Evaluate the system
-        eval_sys(start_time, len(pickle.dumps(message)), end_time, message_from, message_to)
+        eval_sys(start_time, len(pickle.dumps(message)), end_time, message_from, message_to, message["msg"])
 
         # Send the message to the server
         try:

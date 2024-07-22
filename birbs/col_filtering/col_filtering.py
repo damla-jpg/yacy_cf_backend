@@ -419,7 +419,7 @@ class COL:
             start_time = time.time()
             _ = send_socket_message(ip, int(port), message)
             end_time = time.time()
-            eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port -  100))
+            eval_sys(start_time, len(pickle.dumps(message)), end_time, self.delta, str(self.ip_address) + ":" + str(self.port), str(ip) + ":" + str(port -  100),msg)
         except Exception as e:
             col_logger.error("An error occurred while sending message: %s", e)
 

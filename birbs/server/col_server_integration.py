@@ -109,10 +109,16 @@ class COLServerIntegration:
             with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
                 peer_dict = json.load(f)
         except FileNotFoundError:
-            pass
+            col_integration_logger.error("Whitelist file not found")
         except json.JSONDecodeError:
-            print(f)
-            print("Error decoding JSON")
+            col_integration_logger.error("Error decoding JSON")
+
+        for peer in peer_dict["whitelist"]:
+            if peer["hash"] == hash_peer:
+                col_integration_logger.error(
+                    "Peer already exists in the whitelist: %s", data
+                )
+                return
 
         # Append the new entry to the existing data
         peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
@@ -151,7 +157,9 @@ class COLServerIntegration:
             peer for peer in peer_dict["whitelist"] if peer["hash"] != hash_peer
         ]
 
-        col_integration_logger.info("Updated whitelist with removed peer: %s", peer_dict)
+        col_integration_logger.info(
+            "Updated whitelist with removed peer: %s", peer_dict
+        )
 
         with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
             json.dump(peer_dict, f)
@@ -179,9 +187,12 @@ class COLServerIntegration:
             self.col.queue.put(data)
             col_integration_logger.info("Model is added to the queue")
 
-        elif message_type == "SEND_DATA":
-            # ...
-            pass
+        elif message_type == "AUTO_NODE_JOINED":
+            # Update the whitelist
+            col_integration_logger.info("AUTO_NODE_JOINED: %s", data)
+            self.add_to_whitelist(data)
+            col_integration_logger.info("AUTO_NODE_JOINED and Finished")
+
         elif message_type == "NODE_JOINED":
             # Update the whitelist
             self.add_to_whitelist(data)

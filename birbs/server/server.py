@@ -266,69 +266,68 @@ def create_whitelist():
     peer_dict = {"whitelist": []}
 
     # Check if the hash, ip and port are valid
-    if not hash or not ip or not port:
+    if not hash_peer or not ip or not port:
         return jsonify(error="Invalid hash, IP or port")
-    else:
-        # Create a json file in the resources/whitelist folder
-        if not os.path.exists("resources/whitelist"):
-            os.makedirs("resources/whitelist")
 
-        try:
-            with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
-                peer_dict = json.load(f)
-        except FileNotFoundError:
-            # Create a new file if it doesn't exist
-            with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
-                json.dump(peer_dict, f)
-        except json.JSONDecodeError:
-            print(f)
-            print("Error decoding JSON")
+    # Create a json file in the resources/whitelist folder
+    if not os.path.exists("resources/whitelist"):
+        os.makedirs("resources/whitelist")
 
-        # Append the new entry to the existing data
-        peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
+    try:
+        with open("resources/whitelist/whitelist.json", "r", encoding="utf-8") as f:
+            peer_dict = json.load(f)
+    except json.JSONDecodeError:
+        server_logger.error("Error decoding JSON")
 
-        with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
-            json.dump(peer_dict, f)
+    for peer in peer_dict["whitelist"]:
+        if peer["hash"] == hash_peer:
+            return
 
-        if COL_INTEGRATION is None:
-            server_logger.error(
-                "COL_INTEGRATION not initialized, this is happening during whitelist creation."
-            )
-            return jsonify(
-                error="Whitelist created but couldn't send message to the added peer. COL_INTEGRATION not initialized"
-            )
+    # Append the new entry to the existing data
+    peer_dict["whitelist"].append({"hash": hash_peer, "ip": ip, "port": port})
 
-        if COL_INTEGRATION.col is None:
-            server_logger.error(
-                "col not initialized, this is happening during whitelist creation."
-            )
-            return jsonify(
-                error="Whitelist created but couldn't send message to the added peer. COL not initialized"
-            )
+    with open("resources/whitelist/whitelist.json", "w", encoding="utf-8") as f:
+        json.dump(peer_dict, f)
 
-        try:
-            # Current node info
-            crr_ip = COL_INTEGRATION.col.ip_address
-            crr_port = COL_INTEGRATION.col.port
-            crr_hash = COL_INTEGRATION.col.node_id
+    if COL_INTEGRATION is None:
+        server_logger.error(
+            "COL_INTEGRATION not initialized, this is happening during whitelist creation."
+        )
+        return jsonify(
+            error="Whitelist created but couldn't send message to the added peer. COL_INTEGRATION not initialized"
+        )
 
-            # Send a message to the added peer
-            message = {
-                "msg": "NODE_JOINED",
-                "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
-            }
+    if COL_INTEGRATION.col is None:
+        server_logger.error(
+            "col not initialized, this is happening during whitelist creation."
+        )
+        return jsonify(
+            error="Whitelist created but couldn't send message to the added peer. COL not initialized"
+        )
 
-            # TODO: +100 to avoid port conflict. This is a temporary solution
-            send_socket_message(ip, int(port) + 100, message)
-        except Exception as e:
-            server_logger.error(
-                "An error occurred while sending the message to the server: %s", e
-            )
-            return jsonify(
-                error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server "
-            )
+    try:
+        # Current node info
+        crr_ip = COL_INTEGRATION.col.ip_address
+        crr_port = COL_INTEGRATION.col.port
+        crr_hash = COL_INTEGRATION.col.node_id
 
-        return jsonify(message="Whitelist created")
+        # Send a message to the added peer
+        message = {
+            "msg": "NODE_JOINED",
+            "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
+        }
+
+        # TODO: +100 to avoid port conflict. This is a temporary solution
+        send_socket_message(ip, int(port) + 100, message)
+    except Exception as e:
+        server_logger.error(
+            "An error occurred while sending the message to the server: %s", e
+        )
+        return jsonify(
+            error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server "
+        )
+
+    return jsonify(message="Whitelist created")
 
 
 @app.route("/api/get_whitelist", methods=["GET"])
@@ -497,6 +496,84 @@ def receive_model():
 
     server_logger.info("Model Forwarded")
     return jsonify(message="Model received")
+
+
+@app.route("/api/is_senior", methods=["GET"])
+def is_senior():
+    """
+    This function checks if the peer is a senior peer.
+    """
+
+    return jsonify('{"is_senior": true}')
+
+
+@app.route("/api/auto_whitelist", methods=["GET"])
+def auto_whitelist():
+    """
+    This function automatically adds a peer to the whitelist. FOR DEMO PURPOSES ONLY
+    """
+
+    server_logger.info("Auto whitelist called")
+
+    auto_wl = os.getenv("DEBUG_AUTO_WHITELIST", None)
+    if auto_wl is None or int(auto_wl) == 0:
+        server_logger.error("Auto whitelist not enabled")
+        return jsonify(error="Auto whitelist not enabled")
+
+    if COL_INTEGRATION is None:
+        server_logger.error("COL not initialized")
+        return jsonify(error="COL not initialized")
+
+    server_logger.info("Auto whitelist enabled")
+
+    yacy_info = COL_INTEGRATION.yacy_info
+
+    if yacy_info is None:
+        server_logger.error("YACY info not found")
+        return jsonify(error="YACY info not found")
+
+    # Current node info
+    crr_ip = COL_INTEGRATION.col.ip_address
+    crr_port = COL_INTEGRATION.col.port
+    crr_hash = COL_INTEGRATION.col.node_id
+
+    # Send a message to the added peer
+    message = {
+        "msg": "AUTO_NODE_JOINED",
+        "data": {"ip": crr_ip, "port": crr_port, "hash": crr_hash},
+    }
+
+    # Get the number of nodes
+    num_nodes = os.getenv("DEBUG_AUTO_WHITELIST_NUM_NODES")
+
+    if num_nodes is None:
+        server_logger.error("Number of nodes not found")
+        return jsonify(error="Number of nodes not found")
+
+    # This is the initial port number for docker testing. Whenever, we run the peer_sim, the first node is created on port 8092
+    inital_port = 8092
+    # This is for local testing with docker. See yacy_cf_peer_sim for more info
+    # Every node created in peer_sim has a port number that is 1 more than the previous node (since the
+    # socket is running on + 100 we do + 101)
+    try:
+        for i in range(int(num_nodes)):
+            yacy_port = inital_port + i
+
+            if yacy_port == crr_port:
+                continue
+
+            send_socket_message(crr_ip, int(yacy_port) + 100, message)
+
+    except Exception as e:
+        server_logger.error(
+            "An error occurred while sending the message to the server: %s", e
+        )
+        return jsonify(
+            error="Whitelist created but couldn't send message to the added peer. Error occurred while sending the message to the server "
+        )
+
+    server_logger.info("Auto whitelist created")
+    return jsonify(message="Auto whitelist created")
 
 
 def start_server(host: str, port: int, col_int: cf.COLServerIntegration):

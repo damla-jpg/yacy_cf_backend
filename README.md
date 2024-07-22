@@ -1,9 +1,11 @@
 # BIRB NEST INFO:
-- In order to access the servers from a outside network, used ports (see config.json) needs to be forwarded. 
+- In order to access the servers from a outside network, used ports (see config.json) needs to be forwarded.
 - Since the socket is running on a separate port, the peers need to know the socket port of other peers. Normally,
 this would be integrated into yacy so that we can use the assigned port. This is a future work.
 - We are not checking if there is a packet loss or loss of data during the model transmission. This is a future work.
 - Assuming that this is implemented in the yacy system, there wont be a need for whitelist as it is right now
+- Due to docker implementation, config support is currently changed with env variables. Update config module so that if
+there are no env variables use the config file instead.
 
 # Project Name
 

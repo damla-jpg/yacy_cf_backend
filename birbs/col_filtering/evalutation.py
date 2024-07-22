@@ -25,7 +25,7 @@ def get_number_of_peers_in_list():
     
     return len(whitelist["whitelist"])
 
-def evaluate_sending(start_time: float, message_size: int, end_time: float, delta: float, from_: str, to_: str):
+def evaluate_sending(start_time: float, message_size: int, end_time: float, delta: float, from_: str, to_: str, message_type: str):
     """
     This function saves the sending message time and size in a csv file.
     """
@@ -34,14 +34,14 @@ def evaluate_sending(start_time: float, message_size: int, end_time: float, delt
 
     if not os.path.exists("resources/data/evaluation.csv"):
         with open("resources/data/evaluation.csv", "w", encoding="utf-8") as file:
-            file.write("start_time,end_time,delta,elapsed_time,message_size,sending,from,to,num_peers\n")
+            file.write("start_time,end_time,delta,elapsed_time,message_size,sending,from,to,num_peers,message_type\n")
 
     with open("resources/data/evaluation.csv", "a", encoding="utf-8") as file:
-        file.write(f"{start_time},{end_time},{delta},{elapsed_time},{message_size},{True},{from_},{to_},{get_number_of_peers_in_list()}\n")
+        file.write(f"{start_time},{end_time},{delta},{elapsed_time},{message_size},{True},{from_},{to_},{get_number_of_peers_in_list()},{message_type}\n")
     
 
 
-def evaluate_receiving(start_time: float, message_size: int, end_time: float, from_: str, to_: str):
+def evaluate_receiving(start_time: float, message_size: int, end_time: float, from_: str, to_: str, message_type: str):
     """
     This function saves the receiving message time and size in a csv file.
     """
@@ -50,7 +50,21 @@ def evaluate_receiving(start_time: float, message_size: int, end_time: float, fr
 
     if not os.path.exists("resources/data/evaluation.csv"):
         with open("resources/data/evaluation.csv", "w", encoding="utf-8") as file:
-            file.write("start_time,end_time,delta,elapsed_time,message_size,sending,from,to,num_peers\n")
+            file.write("start_time,end_time,delta,elapsed_time,message_size,sending,from,to,num_peers,message_type\n")
     
     with open("resources/data/evaluation.csv", "a", encoding="utf-8") as file:
-        file.write(f"{start_time},{end_time}, ,{elapsed_time},{message_size},{False},{from_},{to_},{get_number_of_peers_in_list()}\n")
+        file.write(f"{start_time},{end_time}, ,{elapsed_time},{message_size},{False},{from_},{to_},{get_number_of_peers_in_list()},{message_type}\n")
+
+def evaluate_startup(start_time: float, end_time: float, port_num: str, success: bool):
+    """
+    This function saves the startup time in a csv file.
+    """
+
+    elapsed_time = end_time - start_time
+
+    if not os.path.exists("resources/data/startup.csv"):
+        with open("resources/data/startup.csv", "w", encoding="utf-8") as file:
+            file.write("start_time,end_time,elapsed_time,portnum,success\n")
+    
+    with open("resources/data/startup.csv", "a", encoding="utf-8") as file:
+        file.write(f"{start_time},{end_time},{elapsed_time},{port_num},{success}\n")

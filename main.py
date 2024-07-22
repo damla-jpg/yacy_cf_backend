@@ -17,6 +17,7 @@ import requests as req
 from birbs.server import start_server
 from birbs.communication import Listener
 import birbs.server.col_server_integration as col_server_integration
+from birbs.col_filtering.evalutation import evaluate_startup as evaluate_startup
 
 
 class Birbs:
@@ -134,7 +135,7 @@ class Birbs:
 
         seedlist_url = f"http://{yacy_service}:{yacy_port}/yacy/seedlist.json"
         ip_url = "https://api.ipify.org"
-
+        start_time = time.time()
         try:
             response = req.get(seedlist_url, timeout=60)
 
@@ -142,7 +143,9 @@ class Birbs:
                 peers = response.json()
                 try:
                     ip = req.get(ip_url, timeout=60).text
-                    if ip == peers["peers"][0]["IP"] and peers["peers"][0]["PeerType"] == "senior":
+                    if ip == peers["peers"][0]["IP"] and yacy_port == peers["peers"][0]["Port"] and peers["peers"][0]["PeerType"] == "senior":
+                        end_time = time.time()
+                        evaluate_startup(start_time, end_time, yacy_port, True)
                         return True
                 except Exception as _:
                     self.logger.error("An error occurred during fetching the IP")
@@ -150,6 +153,9 @@ class Birbs:
                 self.logger.error("An error occurred during fetching the peers: %s", response.status_code)
         except Exception as _:
             self.logger.error("An error occurred during peer check.")
+        
+        end_time = time.time()
+        evaluate_startup(start_time, end_time, yacy_port, False)
 
         return False
 
