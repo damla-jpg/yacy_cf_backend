@@ -1,6 +1,6 @@
 # Collaborative Filtering Integration to the YaCy Decentralized Search Engine
 ## General information:
-- In order to access the servers from a outside network, used ports (see config.json) needs to be forwarded.
+- In order to access the servers from a outside network, used ports (see ``` docker-compose.yml ```) needs to be forwarded.
 - Since the socket is running on a separate port, the peers that will collaborate should be added to the whitelist.
 - For this project, the socket port should be YaCy port + 100.
 - There is no check for packet loss or loss of data during the model transmission. This is a future work.
