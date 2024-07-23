@@ -1,22 +1,26 @@
-# BIRB NEST INFO:
+# Collaborative Filtering Integration to the YaCy Decentralized Search Engine
+## General information:
 - In order to access the servers from a outside network, used ports (see config.json) needs to be forwarded.
-- Since the socket is running on a separate port, the peers need to know the socket port of other peers. Normally,
-this would be integrated into yacy so that we can use the assigned port. This is a future work.
-- We are not checking if there is a packet loss or loss of data during the model transmission. This is a future work.
-- Assuming that this is implemented in the yacy system, there wont be a need for whitelist as it is right now
+- Since the socket is running on a separate port, the peers that will collaborate should be added to the whitelist.
+- For this project, the socket port should be YaCy port + 100.
+- There is no check for packet loss or loss of data during the model transmission. This is a future work.
 - Due to docker implementation, config support is currently changed with env variables. Update config module so that if
 there are no env variables use the config file instead.
-
-# Project Name
-
-Collaborative Filtering Integration to the YaCy Decentralized Search Engine
 
 ## Requirements
 
 - **Python Version**: 3.12.x
-- **Dockerized Yacy**
+- Docker
 
-## Setup Instructions
+## Setup Instructions For Using The System
+
+1. Download the ``` docker-compose.yml ``` file or clone the repository.
+2. Change your working directory to the folder where the ``` docker-compose ``` file is.
+3. In your router settings, go to port forwarding and forward the ports that your YaCy peer is running in and the socket port (YaCy port + 100)
+4. Run ``` docker-compose up ```
+5. In your browser go to ``` localhost:4000 ```
+
+## Setup Instructions For Testing The Backend Only
 
 ### 1. Clone the Repository
 
@@ -86,7 +90,7 @@ http://localhost:[FLASK_PORT]/api/fetch_predictions
 
 Replace `[FLASK_PORT]` with the actual port number specified in your configuration.
 
-### 9. Viewing the Algorithm in Action
+### 9. Viewing the Algorithm in Action (if you don't want to use Docker)
 
 To see the collaborative filtering algorithm in action, follow these steps:
 
@@ -148,11 +152,11 @@ We welcome contributions from the community. To contribute:
 
 ## Contact
 
-For any questions or support, please open an issue on the GitHub repository or contact the project maintainers directly.
+For any questions or support, please open an issue on the GitHub repository or contact the project maintainers directly at damlaural@gmail.com .
 
 ---
 
-Thank you for using and contributing to the Collaborative Filtering Integration to the YaCy Decentralized Search Engine. Together, we can enhance the power of decentralized search!
+Thank you for using and contributing to the Collaborative Filtering Integration to the YaCy Decentralized Search Engine.
 
 ## Acknowledgements
 - Collabrative Filtering Algorithm that has been used and altered in this project is from Krishna Shukla and can be found from
