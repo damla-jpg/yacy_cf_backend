@@ -66,7 +66,7 @@ docker run -d -p 8090:8090 yacy
 
 ### 6. Configure Ports and Network
 
-Forward the necessary ports as specified in `config.json` to allow external network access. Ensure that the socket port of each peer is known to other peers.
+Forward the necessary ports to allow external network access. Ensure that the socket port of each peer is known to other peers.
 
 Ports to be forwarded:
 - Yacy port
@@ -128,7 +128,7 @@ By following these steps, you'll be able to interact with the front-end interfac
 
 ### Configuring Peers
 
-To configure peers for collaborative filtering, add their socket ports in the `config.json` file. This will enable communication between peers for the filtering process.
+To configure peers for collaborative filtering, add them to your whitelist.
 
 ### Monitoring and Logging
 
