@@ -20,7 +20,7 @@ there are no env variables use the config file instead.
 4. Run ``` docker-compose up ```
 5. In your browser go to ``` localhost:4000 ```
 
-## Setup Instructions For Testing The Backend Only
+## Setup Instructions For Testing The Backend Only (if you don't want to use Docker Compose)
 
 ### 1. Clone the Repository
 
@@ -90,7 +90,7 @@ http://localhost:[FLASK_PORT]/api/fetch_predictions
 
 Replace `[FLASK_PORT]` with the actual port number specified in your configuration.
 
-### 9. Viewing the Algorithm in Action (if you don't want to use Docker)
+### 9. Viewing the Algorithm in Action
 
 To see the collaborative filtering algorithm in action, follow these steps:
 
