@@ -95,7 +95,7 @@ class COL:
             return
 
         return history["history"]
-    
+
     def add_links(self, key):
         """
         Add links to the search history of the node.
@@ -210,7 +210,7 @@ class COL:
         # If the whitelist file does not exist, return None
         if not os.path.exists("resources/whitelist/whitelist.json"):
             return None
-        
+
         # If the whitelist file is empty, return None
         if os.stat("resources/whitelist/whitelist.json").st_size == 0:
             return None
@@ -442,7 +442,7 @@ class COL:
             weights.append(y[0][hash_]["w"])
             cis.append(y[0][hash_]["ci"])
             links.append(y[0][hash_]["links"])
-            
+
 
         predictions = np.matmul(xi, np.array(weights).T) - bi - cis
         indexes = np.argsort(predictions)[::-1]
@@ -463,7 +463,7 @@ class COL:
             if len(nonlocal_hashes) > self.max_rec:
                 nonlocal_hashes = nonlocal_hashes[0 : self.max_rec]
                 nonlocal_links = nonlocal_links[0 : self.max_rec]
-        
+
         col_logger.info("Predictions: %s", nonlocal_hashes)
         col_logger.info("Links: %s", nonlocal_links)
 
@@ -527,9 +527,11 @@ class COL:
         Input: model: Model of the format:
             {
                 Y: {
-                   hash_1: { w: -, age: -, ci: - },
+                   hash_1: { w: -, age: -, ci: - ,
+                   links : [hash_link_1, hash_link_2, ...]},
                    ...
-                   hash_n: { w: -, age: -, ci: - }
+                   hash_n: { w: -, age: -, ci: -,
+                   links : [hash_link_1, hash_link_2, ...]}
                 },
                 history: []
             }
